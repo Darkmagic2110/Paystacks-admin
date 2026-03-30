@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin - Set Keys, Add Coins & View History</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+    background: black;
+    color: white;
+    font-family: 'Poppins', sans-serif;
+    text-align: center;
+    padding: 20px;
+}
+h1 {
+    font-size: 28px;
+    color: red;
+    margin-bottom: 20px;
+}
+input[type="text"], input[type="password"], input[type="number"] {
+    width: 90%;
+    padding: 12px;
+    font-size: 16px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: none;
+}
+button {
+    width: 92%;
+    padding: 14px;
+    background: #e60000;
+    font-size: 16px;
+    color: #ffffff;
+    font-weight: 600;
+    border-radius: 10px;
+    border: none;
+    margin-top: 12px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: 0.3s ease-in-out;
+    box-shadow: 0 0 18px rgba(255, 0, 0, 0.7);
+}
+button:hover {
+    box-shadow: 0 0 25px rgba(255, 0, 0, 1);
+}
+#status {
+    margin-top: 15px;
+    font-size: 16px;
+    color: yellow;
+}
+#historyBox {
+    margin-top: 25px;
+    text-align: left;
+}
+.history-item {
+    background: #111;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 10px 0;
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Poppins', sans-serif;
+}
+.history-left { text-align: left; }
+.history-right { text-align: right; }
+.history-title { color: lime; }
+.history-sub { font-size: 12px; color: #aaa; }
+.history-naira { color: cyan; font-size: 13px; }
+#toast {
+    visibility: hidden;
+    min-width: 240px;
+    background-color: red;
+    color: black;
+    text-align: center;
+    border-radius: 10px;
+    padding: 12px;
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s, bottom 0.3s;
+}
+#toast.show {
+    visibility: visible;
+    opacity: 1;
+    bottom: 50px;
+}
+</style>
+</head>
+<body>
+
+<h1>Admin: Set Paystack Keys</h1>
+<input type="text" id="publicKey" placeholder="Enter Paystack Public Key" />
+<input type="password" id="secretKey" placeholder="Enter Paystack Secret Key" />
+<button id="saveBtn">💾 Save Keys</button>
+
+<hr style="margin:20px 0; border-color: #444;" />
+
+<h1>Add Coins to User</h1>
+<input type="text" id="userEmail" placeholder="Enter User Email" />
+<input type="number" id="coinAmount" placeholder="Enter Amount" min="1" />
+<button id="addCoinsBtn">💰 Add Coins</button>
+
+<hr style="margin:20px 0; border-color: #444;" />
+
+<h1>View User Transaction History</h1>
+<input type="text" id="historyEmail" placeholder="Enter User Email" />
+<button id="loadHistoryBtn">📜 Load History</button>
+
+<div id="status"></div>
+<div id="historyBox">
+    <h3>Transactions</h3>
+    <div id="historyList"></div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+/* ---------------------------
+   Firebase initialization
+--------------------------- */
+const firebaseConfig = {
+    apiKey: "AIzaSyDvFDByPPo9zgwKLdPaREz1OVMQCXmPfrs",
+    authDomain: "bets-d795d.firebaseapp.com",
+    projectId: "bets-d795d",
+    storageBucket: "bets-d795d.appspot.com",
+    messagingSenderId: "384386108287",
+    appId: "1:384386108287:android:d238a5ec8068d9bb9be84a",
+    databaseURL: "https://bets-d795d-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ---------------------------
+   Toast helper
+--------------------------- */
+function toast(msg) {
+    const t = document.getElementById("toast");
+    t.innerHTML = msg;
+    t.className = "show";
+    setTimeout(() => { t.className = t.className.replace("show", ""); }, 3000);
+}
+
+/* ---------------------------
+   Admin auth check
+--------------------------- */
+firebase.auth().onAuthStateChanged(user => {
+    if (!user) {
+        window.location.href = "login.html"; // redirect to login
+        return;
+    }
+});
+
+/* ---------------------------
+   Save Paystack keys
+--------------------------- */
+document.getElementById("saveBtn").onclick = () => {
+    const publicKey = document.getElementById("publicKey").value.trim();
+    const secretKey = document.getElementById("secretKey").value.trim();
+    if (!publicKey || !secretKey) return toast("Both keys are required");
+    db.ref("settings/paystackKeys").set({ public: publicKey, secret: secretKey })
+    .then(() => { document.getElementById("status").innerHTML = "✅ Keys saved successfully!"; toast("Keys updated"); })
+    .catch(err => { document.getElementById("status").innerHTML = "❌ Error saving keys"; toast(err.message); });
+};
+
+/* ---------------------------
+   Add coins to user
+--------------------------- */
+document.getElementById("addCoinsBtn").onclick = () => {
+    const email = document.getElementById("userEmail").value.trim();
+    const amount = parseInt(document.getElementById("coinAmount").value);
+    if (!email || !amount || amount < 1) return toast("Enter valid email and amount");
+
+    db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
+        if (!snapshot.exists()) return toast("User not found!");
+        snapshot.forEach(userSnap => {
+            const userRef = db.ref("users/" + userSnap.key + "/balance");
+            userRef.transaction(current => (current || 0) + amount);
+            toast(`✅ Added ${amount} coins to ${email}`);
+
+            // Also record this as deposit transaction
+            const txRef = db.ref("users/" + userSnap.key + "/transactions");
+            txRef.push({
+                type: "deposit",
+                coins: amount,
+                amount: amount,
+                ref: "DEP-" + Date.now(),
+                time: Date.now(),
+                email: email,
+                uid: userSnap.key
+            });
+        });
+    }).catch(err => { toast("❌ Error adding coins: " + err.message); });
+};
+
+/* ---------------------------
+   Load user transaction history
+--------------------------- */
+document.getElementById("loadHistoryBtn").onclick = () => {
+    const email = document.getElementById("historyEmail").value.trim();
+    if (!email) return toast("Enter a valid email");
+
+    db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
+        if (!snapshot.exists()) return toast("User not found");
+
+        snapshot.forEach(userSnap => {
+            const transactionsRef = db.ref("users/" + userSnap.key + "/transactions");
+            transactionsRef.once("value").then(txSnap => {
+                let txArr = [];
+                txSnap.forEach(child => { txArr.push(child.val()); });
+
+                // Sort latest first
+                txArr.sort((a,b) => b.time - a.time);
+
+                const historyList = document.getElementById("historyList");
+                historyList.innerHTML = "";
+                txArr.forEach(tx => {
+                    const d = new Date(tx.time).toLocaleString();
+                    let title = "";
+                    let amount = "";
+                    if(tx.type === "deposit") {
+                        title = `+${tx.coins} Coins (DEPOSIT)`;
+                        amount = `₦${tx.amount}`;
+                    } else if(tx.type === "bet" || tx.type === "deduction") {
+                        // Show the game name if available
+                        title = `${tx.coins < 0 ? tx.coins : "+"+tx.coins} Coins (DEDUCTION${tx.game ? " - " + tx.game : ""})`;
+                        amount = tx.amount ? `₦${tx.amount}` : "";
+                    } else {
+                        title = `${tx.coins} Coins (${tx.type.toUpperCase()})`;
+                        amount = tx.amount ? `₦${tx.amount}` : "";
+                    }
+                    historyList.innerHTML += `
+                        <div class="history-item">
+                            <div class="history-left">
+                                <div class="history-title">${title}</div>
+                                <div class="history-sub">${tx.ref || ""}</div>
+                                <div class="history-sub">${d}</div>
+                            </div>
+                            <div class="history-right">
+                                <div>${tx.coins > 0 ? "+"+tx.coins : tx.coins}</div>
+                                <div class="history-naira">${amount}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                toast(`✅ Loaded ${txArr.length} transactions for ${email}`);
+            });
+        });
+    }).catch(err => { toast("❌ Error: " + err.message); });
+};
+</script>
+
+</body>
+</html>
