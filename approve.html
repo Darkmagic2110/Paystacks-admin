@@ -15,6 +15,7 @@ body {
     padding: 10px;
 }
 h1 { color: red; text-align:center; margin-bottom:20px; }
+
 .deposit-item {
     background:#111;
     padding:12px;
@@ -24,8 +25,10 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     justify-content:space-between;
     align-items:center;
 }
+
 .deposit-left { flex:1; text-align:left; }
 .deposit-right { display:flex; gap:8px; }
+
 .deposit-right button {
     padding:6px 12px;
     border:none;
@@ -33,32 +36,22 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     font-weight:bold;
     cursor:pointer;
 }
+
 .approve-btn { background:green; color:white; }
 .decline-btn { background:red; color:white; }
-.deposit-image { max-width:80px; max-height:80px; margin-top:8px; cursor:pointer; border:1px solid #555; border-radius:4px; }
-#imageModal {
-    display:none;
-    position:fixed;
-    z-index:1000;
-    left:0; top:0; width:100%; height:100%;
-    background:rgba(0,0,0,0.8);
-    justify-content:center; align-items:center;
+
+.time {
+    font-size:12px;
+    color:#aaa;
 }
-#imageModal img { max-width:90%; max-height:90%; border-radius:8px; }
-#imageModal span {
-    position:absolute;
-    top:20px; right:30px;
-    font-size:30px;
-    color:white;
-    cursor:pointer;
-    font-weight:bold;
-}
+
 #bulkButtons {
     margin-top:20px;
     display:flex;
     justify-content:center;
     gap:15px;
 }
+
 #bulkButtons button {
     padding:10px 20px;
     font-weight:bold;
@@ -66,9 +59,11 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     border-radius:6px;
     cursor:pointer;
 }
+
 #approveAllBtn { background:green; color:white; }
 #deleteAllBtn { background:red; color:white; }
 #blockBtn { background:orange; color:white; }
+
 #searchInput {
     padding:8px 12px;
     width:300px;
@@ -78,11 +73,11 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
 }
 </style>
 </head>
+
 <body>
 
 <h1>Admin - Deposit Approvals</h1>
 
-<!-- Search Input -->
 <div style="text-align:center; margin-bottom:20px;">
     <input type="text" id="searchInput" placeholder="Search by Account Name">
 </div>
@@ -95,14 +90,7 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     <button id="blockBtn">Block Deposits</button>
 </div>
 
-<!-- Modal for full image -->
-<div id="imageModal" onclick="closeModal()">
-    <span onclick="closeModal()">×</span>
-    <img id="fullImage" src="">
-</div>
-
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
@@ -116,161 +104,129 @@ const firebaseConfig = {
     databaseURL: "https://bets-d795d-default-rtdb.firebaseio.com"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
 
+const db = firebase.database();
 const depositList = document.getElementById("depositList");
-const approveAllBtn = document.getElementById("approveAllBtn");
-const deleteAllBtn = document.getElementById("deleteAllBtn");
-const blockBtn = document.getElementById("blockBtn");
 const searchInput = document.getElementById("searchInput");
 
-// Show full image modal
-function showImage(src) {
-    document.getElementById("fullImage").src = src;
-    document.getElementById("imageModal").style.display = "flex";
-}
-function closeModal() { document.getElementById("imageModal").style.display = "none"; }
+let allDeposits = [];
 
-// Load pending deposits only
-function loadDeposits() {
-    depositList.innerHTML = "";
-    db.ref("users").once("value", snap => {
-        let deposits = [];
+// 🔥 REALTIME LISTENER (AUTO REFRESH)
+db.ref("users").on("value", snap => {
+    allDeposits = [];
 
-        snap.forEach(userSnap => {
-            const uid = userSnap.key;
-            const userData = userSnap.val();
-            if(!userData.transactions) return;
+    snap.forEach(userSnap => {
+        const uid = userSnap.key;
+        const userData = userSnap.val();
 
-            Object.keys(userData.transactions).forEach(txKey => {
-                const tx = userData.transactions[txKey];
-                if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")) {
-                    deposits.push({ uid, userData, txKey, tx, timestamp: tx.timestamp || 0 });
-                }
-            });
-        });
+        if(!userData.transactions) return;
 
-        // Sort deposits newest first
-        deposits.sort((a, b) => b.timestamp - a.timestamp);
+        Object.keys(userData.transactions).forEach(txKey => {
+            const tx = userData.transactions[txKey];
 
-        // Filter by account name
-        const query = searchInput.value.toLowerCase();
-        deposits.forEach(({uid, userData, txKey, tx}) => {
-            const accountName = (tx.accountName || "").toLowerCase();
-            if(accountName.includes(query)) {
-                const div = document.createElement("div");
-                div.className = "deposit-item";
-
-                let imgHTML = '';
-                if(tx.image) imgHTML = `<img class="deposit-image" src="${tx.image}" onclick="showImage('${tx.image}')">`;
-
-                div.innerHTML = `
-                    <div class="deposit-left">
-                        <strong>${tx.accountName || userData.email || uid}</strong><br>
-                        Amount: ₦${tx.amount} (${tx.coins} Coins)<br>
-                        Account Number: ${tx.accountNumber}<br>
-                        ${imgHTML}
-                    </div>
-                    <div class="deposit-right">
-                        <button class="approve-btn">Approve</button>
-                        <button class="decline-btn">Decline</button>
-                    </div>
-                `;
-
-                const approveBtn = div.querySelector(".approve-btn");
-                const declineBtn = div.querySelector(".decline-btn");
-
-                approveBtn.onclick = () => {
-                    const userRef = db.ref("users/" + uid);
-                    userRef.child("balance").once("value").then(snap => {
-                        let current = snap.val() || 0;
-                        userRef.child("balance").set(current + tx.coins);
-                    });
-                    db.ref("users/" + uid + "/transactions/" + txKey + "/status").set("approved")
-                    .then(() => loadDeposits());
-                };
-
-                declineBtn.onclick = () => {
-                    db.ref("users/" + uid + "/transactions/" + txKey).remove()
-                    .then(() => loadDeposits());
-                };
-
-                depositList.appendChild(div);
+            if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")){
+                allDeposits.push({ uid, txKey, tx, userData });
             }
         });
     });
+
+    renderDeposits();
+});
+
+// 🔥 RENDER FUNCTION
+function renderDeposits() {
+    depositList.innerHTML = "";
+
+    const query = searchInput.value.toLowerCase();
+
+    // SORT NEWEST FIRST
+    allDeposits.sort((a,b)=> (b.tx.time || 0) - (a.tx.time || 0));
+
+    allDeposits.forEach(({uid, txKey, tx, userData}) => {
+
+        const name = (tx.accountName || "").toLowerCase();
+        if(!name.includes(query)) return;
+
+        const time = tx.time ? new Date(tx.time).toLocaleString() : "No time";
+
+        const div = document.createElement("div");
+        div.className = "deposit-item";
+
+        div.innerHTML = `
+            <div class="deposit-left">
+                <strong>${tx.accountName || userData.email || uid}</strong><br>
+                Amount: ₦${tx.amount} (${tx.coins} Coins)<br>
+                <span class="time">🕒 ${time}</span>
+            </div>
+            <div class="deposit-right">
+                <button class="approve-btn">Approve</button>
+                <button class="decline-btn">Delete</button>
+            </div>
+        `;
+
+        div.querySelector(".approve-btn").onclick = () => approveDeposit(uid, txKey, tx);
+        div.querySelector(".decline-btn").onclick = () => deleteDeposit(uid, txKey);
+
+        depositList.appendChild(div);
+    });
 }
 
-// Search functionality
-searchInput.addEventListener("input", loadDeposits);
+// 🔍 SEARCH
+searchInput.addEventListener("input", renderDeposits);
 
-// Bulk Approve All
-approveAllBtn.onclick = () => {
-    if(!confirm("Are you sure you want to approve ALL pending deposits?")) return;
+// ✅ APPROVE ONE
+function approveDeposit(uid, txKey, tx) {
+    const userRef = db.ref("users/" + uid);
 
-    db.ref("users").once("value").then(snap => {
-        snap.forEach(userSnap => {
-            const uid = userSnap.key;
-            const userData = userSnap.val();
-            if(!userData.transactions) return;
+    userRef.child("balance").once("value").then(snap => {
+        let current = snap.val() || 0;
+        userRef.child("balance").set(current + tx.coins);
+    });
 
-            Object.keys(userData.transactions).forEach(txKey => {
-                const tx = userData.transactions[txKey];
-                if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")) {
-                    const userRef = db.ref("users/" + uid);
-                    userRef.child("balance").once("value").then(snap => {
-                        let current = snap.val() || 0;
-                        userRef.child("balance").set(current + tx.coins);
-                    });
-                    db.ref("users/" + uid + "/transactions/" + txKey + "/status").set("approved");
-                }
-            });
-        });
-    }).then(() => loadDeposits());
+    db.ref(`users/${uid}/transactions/${txKey}/status`).set("approved");
+}
+
+// ❌ DELETE ONE
+function deleteDeposit(uid, txKey) {
+    db.ref(`users/${uid}/transactions/${txKey}`).remove();
+}
+
+// 🔥 APPROVE ALL
+document.getElementById("approveAllBtn").onclick = () => {
+    if(!confirm("Approve ALL deposits?")) return;
+
+    allDeposits.forEach(({uid, txKey, tx}) => {
+        approveDeposit(uid, txKey, tx);
+    });
 };
 
-// Bulk Delete All
-deleteAllBtn.onclick = () => {
-    if(!confirm("Are you sure you want to DELETE ALL pending deposits?")) return;
+// 🔥 DELETE ALL
+document.getElementById("deleteAllBtn").onclick = () => {
+    if(!confirm("Delete ALL deposits?")) return;
 
-    db.ref("users").once("value").then(snap => {
-        snap.forEach(userSnap => {
-            const uid = userSnap.key;
-            const userData = userSnap.val();
-            if(!userData.transactions) return;
-
-            Object.keys(userData.transactions).forEach(txKey => {
-                const tx = userData.transactions[txKey];
-                if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")) {
-                    db.ref("users/" + uid + "/transactions/" + txKey).remove();
-                }
-            });
-        });
-    }).then(() => loadDeposits());
+    allDeposits.forEach(({uid, txKey}) => {
+        deleteDeposit(uid, txKey);
+    });
 };
 
-// BLOCK / UNBLOCK DEPOSITS toggle button
+// 🔥 BLOCK / UNBLOCK
 function updateBlockBtn() {
     db.ref("admin/blockDeposit").once("value").then(snap => {
         const blocked = snap.val() === true;
-        blockBtn.textContent = blocked ? "Unblock Deposits" : "Block Deposits";
+        document.getElementById("blockBtn").innerText =
+            blocked ? "Unblock Deposits" : "Block Deposits";
     });
 }
 updateBlockBtn();
 
-blockBtn.onclick = () => {
+document.getElementById("blockBtn").onclick = () => {
     db.ref("admin/blockDeposit").once("value").then(snap => {
-        const currentlyBlocked = snap.val() === true;
-        const newValue = !currentlyBlocked;
-        db.ref("admin/blockDeposit").set(newValue).then(() => {
-            alert(newValue ? "Deposits are now BLOCKED" : "Deposits are now UNBLOCKED");
-            updateBlockBtn();
-        });
+        const newValue = !(snap.val() === true);
+        db.ref("admin/blockDeposit").set(newValue);
+        updateBlockBtn();
+        alert(newValue ? "Deposits BLOCKED" : "Deposits UNBLOCKED");
     });
 };
-
-// Initial load
-loadDeposits();
 </script>
 
 </body>
