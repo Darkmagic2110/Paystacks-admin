@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - Deposit Approval</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+
+<style>
+body {
+    background: black;
+    color: white;
+    font-family: 'Poppins', sans-serif;
+    padding: 10px;
+}
+h1 { color: red; text-align:center; margin-bottom:20px; }
+.deposit-item {
+    background:#111;
+    padding:12px;
+    border-radius:10px;
+    margin:10px 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+.deposit-left { flex:1; text-align:left; }
+.deposit-right { display:flex; gap:8px; }
+.deposit-right button {
+    padding:6px 12px;
+    border:none;
+    border-radius:6px;
+    font-weight:bold;
+    cursor:pointer;
+}
+.approve-btn { background:green; color:white; }
+.decline-btn { background:red; color:white; }
+.deposit-image { max-width:80px; max-height:80px; margin-top:8px; cursor:pointer; border:1px solid #555; border-radius:4px; }
+#imageModal {
+    display:none;
+    position:fixed;
+    z-index:1000;
+    left:0; top:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.8);
+    justify-content:center; align-items:center;
+}
+#imageModal img { max-width:90%; max-height:90%; border-radius:8px; }
+#imageModal span {
+    position:absolute;
+    top:20px; right:30px;
+    font-size:30px;
+    color:white;
+    cursor:pointer;
+    font-weight:bold;
+}
+#bulkButtons {
+    margin-top:20px;
+    display:flex;
+    justify-content:center;
+    gap:15px;
+}
+#bulkButtons button {
+    padding:10px 20px;
+    font-weight:bold;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+}
+#approveAllBtn { background:green; color:white; }
+#deleteAllBtn { background:red; color:white; }
+#blockBtn { background:orange; color:white; }
+#searchInput {
+    padding:8px 12px;
+    width:300px;
+    border-radius:6px;
+    border:none;
+    font-size:16px;
+}
+</style>
+</head>
+<body>
+
+<h1>Admin - Deposit Approvals</h1>
+
+<!-- Search Input -->
+<div style="text-align:center; margin-bottom:20px;">
+    <input type="text" id="searchInput" placeholder="Search by Account Name">
+</div>
+
+<div id="depositList"></div>
+
+<div id="bulkButtons">
+    <button id="approveAllBtn">Approve All</button>
+    <button id="deleteAllBtn">Delete All</button>
+    <button id="blockBtn">Block Deposits</button>
+</div>
+
+<!-- Modal for full image -->
+<div id="imageModal" onclick="closeModal()">
+    <span onclick="closeModal()">×</span>
+    <img id="fullImage" src="">
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyDvFDByPPo9zgwKLdPaREz1OVMQCXmPfrs",
+    authDomain: "bets-d795d.firebaseapp.com",
+    projectId: "bets-d795d",
+    storageBucket: "bets-d795d.appspot.com",
+    messagingSenderId: "384386108287",
+    appId: "1:384386108287:android:d238a5ec8068d9bb9be84a",
+    databaseURL: "https://bets-d795d-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const depositList = document.getElementById("depositList");
+const approveAllBtn = document.getElementById("approveAllBtn");
+const deleteAllBtn = document.getElementById("deleteAllBtn");
+const blockBtn = document.getElementById("blockBtn");
+const searchInput = document.getElementById("searchInput");
+
+// Show full image modal
+function showImage(src) {
+    document.getElementById("fullImage").src = src;
+    document.getElementById("imageModal").style.display = "flex";
+}
+function closeModal() { document.getElementById("imageModal").style.display = "none"; }
+
+// Load pending deposits only
+function loadDeposits() {
+    depositList.innerHTML = "";
+    db.ref("users").once("value", snap => {
+        let deposits = [];
+
+        snap.forEach(userSnap => {
+            const uid = userSnap.key;
+            const userData = userSnap.val();
+            if(!userData.transactions) return;
+
+            Object.keys(userData.transactions).forEach(txKey => {
+                const tx = userData.transactions[txKey];
+                if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")) {
+                    deposits.push({ uid, userData, txKey, tx, timestamp: tx.timestamp || 0 });
+                }
+            });
+        });
+
+        // Sort deposits newest first
+        deposits.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Filter by account name
+        const query = searchInput.value.toLowerCase();
+        deposits.forEach(({uid, userData, txKey, tx}) => {
+            const accountName = (tx.accountName || "").toLowerCase();
+            if(accountName.includes(query)) {
+                const div = document.createElement("div");
+                div.className = "deposit-item";
+
+                let imgHTML = '';
+                if(tx.image) imgHTML = `<img class="deposit-image" src="${tx.image}" onclick="showImage('${tx.image}')">`;
+
+                div.innerHTML = `
+                    <div class="deposit-left">
+                        <strong>${tx.accountName || userData.email || uid}</strong><br>
+                        Amount: ₦${tx.amount} (${tx.coins} Coins)<br>
+                        Account Number: ${tx.accountNumber}<br>
+                        ${imgHTML}
+                    </div>
+                    <div class="deposit-right">
+                        <button class="approve-btn">Approve</button>
+                        <button class="decline-btn">Decline</button>
+                    </div>
+                `;
+
+                const approveBtn = div.querySelector(".approve-btn");
+                const declineBtn = div.querySelector(".decline-btn");
+
+                approveBtn.onclick = () => {
+                    const userRef = db.ref("users/" + uid);
+                    userRef.child("balance").once("value").then(snap => {
+                        let current = snap.val() || 0;
+                        userRef.child("balance").set(current + tx.coins);
+                    });
+                    db.ref("users/" + uid + "/transactions/" + txKey + "/status").set("approved")
+                    .then(() => loadDeposits());
+                };
+
+                declineBtn.onclick = () => {
+                    db.ref("users/" + uid + "/transactions/" + txKey).remove()
+                    .then(() => loadDeposits());
+                };
+
+                depositList.appendChild(div);
+            }
+        });
+    });
+}
+
+// Search functionality
+searchInput.addEventListener("input", loadDeposits);
+
+// Bulk Approve All
+approveAllBtn.onclick = () => {
+    if(!confirm("Are you sure you want to approve ALL pending deposits?")) return;
+
+    db.ref("users").once("value").then(snap => {
+        snap.forEach(userSnap => {
+            const uid = userSnap.key;
+            const userData = userSnap.val();
+            if(!userData.transactions) return;
+
+            Object.keys(userData.transactions).forEach(txKey => {
+                const tx = userData.transactions[txKey];
+                if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")) {
+                    const userRef = db.ref("users/" + uid);
+                    userRef.child("balance").once("value").then(snap => {
+                        let current = snap.val() || 0;
+                        userRef.child("balance").set(current + tx.coins);
+                    });
+                    db.ref("users/" + uid + "/transactions/" + txKey + "/status").set("approved");
+                }
+            });
+        });
+    }).then(() => loadDeposits());
+};
+
+// Bulk Delete All
+deleteAllBtn.onclick = () => {
+    if(!confirm("Are you sure you want to DELETE ALL pending deposits?")) return;
+
+    db.ref("users").once("value").then(snap => {
+        snap.forEach(userSnap => {
+            const uid = userSnap.key;
+            const userData = userSnap.val();
+            if(!userData.transactions) return;
+
+            Object.keys(userData.transactions).forEach(txKey => {
+                const tx = userData.transactions[txKey];
+                if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")) {
+                    db.ref("users/" + uid + "/transactions/" + txKey).remove();
+                }
+            });
+        });
+    }).then(() => loadDeposits());
+};
+
+// BLOCK / UNBLOCK DEPOSITS toggle button
+function updateBlockBtn() {
+    db.ref("admin/blockDeposit").once("value").then(snap => {
+        const blocked = snap.val() === true;
+        blockBtn.textContent = blocked ? "Unblock Deposits" : "Block Deposits";
+    });
+}
+updateBlockBtn();
+
+blockBtn.onclick = () => {
+    db.ref("admin/blockDeposit").once("value").then(snap => {
+        const currentlyBlocked = snap.val() === true;
+        const newValue = !currentlyBlocked;
+        db.ref("admin/blockDeposit").set(newValue).then(() => {
+            alert(newValue ? "Deposits are now BLOCKED" : "Deposits are now UNBLOCKED");
+            updateBlockBtn();
+        });
+    });
+};
+
+// Initial load
+loadDeposits();
+</script>
+
+</body>
+</html>

@@ -46,6 +46,9 @@ button {
 button:hover {
     box-shadow: 0 0 25px rgba(255, 0, 0, 1);
 }
+#approvePageBtn {
+    background: #00b300;
+}
 #status {
     margin-top: 15px;
     font-size: 16px;
@@ -94,6 +97,10 @@ button:hover {
 </style>
 </head>
 <body>
+
+<h1>Admin Dashboard</h1>
+<!-- Approve Page Button -->
+<button id="approvePageBtn">✅ Approve Page</button>
 
 <h1>Admin: Set Paystack Keys</h1>
 <input type="text" id="publicKey" placeholder="Enter Paystack Public Key" />
@@ -161,6 +168,13 @@ firebase.auth().onAuthStateChanged(user => {
         return;
     }
 });
+
+/* ---------------------------
+   Approve Page navigation
+--------------------------- */
+document.getElementById("approvePageBtn").onclick = () => {
+    window.location.href = "approve.html";
+};
 
 /* ---------------------------
    Save Paystack keys
@@ -233,7 +247,6 @@ document.getElementById("loadHistoryBtn").onclick = () => {
                         title = `+${tx.coins} Coins (DEPOSIT)`;
                         amount = `₦${tx.amount}`;
                     } else if(tx.type === "bet" || tx.type === "deduction") {
-                        // Show the game name if available
                         title = `${tx.coins < 0 ? tx.coins : "+"+tx.coins} Coins (DEDUCTION${tx.game ? " - " + tx.game : ""})`;
                         amount = tx.amount ? `₦${tx.amount}` : "";
                     } else {
