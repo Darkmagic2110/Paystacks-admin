@@ -64,12 +64,43 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
 #deleteAllBtn { background:red; color:white; }
 #blockBtn { background:orange; color:white; }
 
+#paymentModeBox {
+    margin-top: 20px;
+    display:flex;
+    justify-content:center;
+    gap:10px;
+}
+#paymentModeBox button {
+    padding:10px 15px;
+    font-weight:bold;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    background: purple;
+    color:white;
+}
+
 #searchInput {
     padding:8px 12px;
     width:300px;
     border-radius:6px;
     border:none;
     font-size:16px;
+}
+
+/* ===== SPINNER ===== */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.loading-spinner {
+    border: 3px solid #444;
+    border-top: 3px solid white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 1s linear infinite;
+    margin: auto;
 }
 </style>
 </head>
@@ -88,6 +119,12 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     <button id="approveAllBtn">Approve All</button>
     <button id="deleteAllBtn">Delete All</button>
     <button id="blockBtn">Block Deposits</button>
+</div>
+
+<div id="paymentModeBox">
+    <button id="chipperBtn">Chipper</button>
+    <button id="palmpay1Btn">PalmPay 1</button>
+    <button id="palmpay2Btn">PalmPay 2</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -111,7 +148,28 @@ const searchInput = document.getElementById("searchInput");
 
 let allDeposits = [];
 
-// 🔥 REALTIME LISTENER (AUTO REFRESH)
+/* ===== LOADING FUNCTION ===== */
+function showLoading(button) {
+    button.innerHTML = `<div class="loading-spinner"></div>`;
+    button.disabled = true;
+}
+/* ============================ */
+
+document.getElementById("chipperBtn").onclick = () => {
+    db.ref("admin/paymentMode").set("chipper");
+    alert("Switched to CHIPPER");
+};
+
+document.getElementById("palmpay1Btn").onclick = () => {
+    db.ref("admin/paymentMode").set("palmpay1");
+    alert("Switched to PALMPAY 1");
+};
+
+document.getElementById("palmpay2Btn").onclick = () => {
+    db.ref("admin/paymentMode").set("palmpay2");
+    alert("Switched to PALMPAY 2");
+};
+
 db.ref("users").on("value", snap => {
     allDeposits = [];
 
@@ -133,13 +191,11 @@ db.ref("users").on("value", snap => {
     renderDeposits();
 });
 
-// 🔥 RENDER FUNCTION
 function renderDeposits() {
     depositList.innerHTML = "";
 
     const query = searchInput.value.toLowerCase();
 
-    // SORT NEWEST FIRST
     allDeposits.sort((a,b)=> (b.tx.time || 0) - (a.tx.time || 0));
 
     allDeposits.forEach(({uid, txKey, tx, userData}) => {
@@ -164,17 +220,29 @@ function renderDeposits() {
             </div>
         `;
 
-        div.querySelector(".approve-btn").onclick = () => approveDeposit(uid, txKey, tx);
-        div.querySelector(".decline-btn").onclick = () => deleteDeposit(uid, txKey);
+        const approveBtn = div.querySelector(".approve-btn");
+        const declineBtn = div.querySelector(".decline-btn");
+
+        approveBtn.onclick = () => {
+            showLoading(approveBtn);
+            setTimeout(() => {
+                approveDeposit(uid, txKey, tx);
+            }, 1000);
+        };
+
+        declineBtn.onclick = () => {
+            showLoading(declineBtn);
+            setTimeout(() => {
+                deleteDeposit(uid, txKey);
+            }, 1000);
+        };
 
         depositList.appendChild(div);
     });
 }
 
-// 🔍 SEARCH
 searchInput.addEventListener("input", renderDeposits);
 
-// ✅ APPROVE ONE
 function approveDeposit(uid, txKey, tx) {
     const userRef = db.ref("users/" + uid);
 
@@ -186,12 +254,10 @@ function approveDeposit(uid, txKey, tx) {
     db.ref(`users/${uid}/transactions/${txKey}/status`).set("approved");
 }
 
-// ❌ DELETE ONE
 function deleteDeposit(uid, txKey) {
     db.ref(`users/${uid}/transactions/${txKey}`).remove();
 }
 
-// 🔥 APPROVE ALL
 document.getElementById("approveAllBtn").onclick = () => {
     if(!confirm("Approve ALL deposits?")) return;
 
@@ -200,7 +266,6 @@ document.getElementById("approveAllBtn").onclick = () => {
     });
 };
 
-// 🔥 DELETE ALL
 document.getElementById("deleteAllBtn").onclick = () => {
     if(!confirm("Delete ALL deposits?")) return;
 
@@ -209,7 +274,6 @@ document.getElementById("deleteAllBtn").onclick = () => {
     });
 };
 
-// 🔥 BLOCK / UNBLOCK
 function updateBlockBtn() {
     db.ref("admin/blockDeposit").once("value").then(snap => {
         const blocked = snap.val() === true;
