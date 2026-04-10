@@ -64,20 +64,30 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
 #deleteAllBtn { background:red; color:white; }
 #blockBtn { background:orange; color:white; }
 
-#paymentModeBox {
-    margin-top: 20px;
-    display:flex;
-    justify-content:center;
-    gap:10px;
+/* 🔥 PAYMENT SETTINGS */
+#paymentSettings {
+    margin-top: 25px;
+    background: #111;
+    padding: 15px;
+    border-radius: 10px;
 }
-#paymentModeBox button {
-    padding:10px 15px;
-    font-weight:bold;
-    border:none;
-    border-radius:6px;
-    cursor:pointer;
-    background: purple;
-    color:white;
+#paymentSettings input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 6px;
+    border: none;
+}
+#savePaymentBtn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 10px;
+    background: cyan;
+    color: black;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
 #searchInput {
@@ -88,7 +98,6 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     font-size:16px;
 }
 
-/* ===== SPINNER ===== */
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -121,10 +130,13 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     <button id="blockBtn">Block Deposits</button>
 </div>
 
-<div id="paymentModeBox">
-    <button id="chipperBtn">Chipper</button>
-    <button id="palmpay1Btn">PalmPay 1</button>
-    <button id="palmpay2Btn">PalmPay 2</button>
+<!-- 🔥 PAYMENT SETTINGS -->
+<div id="paymentSettings">
+    <h3>💳 Set Payment Details</h3>
+    <input type="text" id="accNumber" placeholder="Account Number">
+    <input type="text" id="bankName" placeholder="Bank Name">
+    <input type="text" id="accName" placeholder="Account Name">
+    <button id="savePaymentBtn">Save Payment Details</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -148,27 +160,39 @@ const searchInput = document.getElementById("searchInput");
 
 let allDeposits = [];
 
-/* ===== LOADING FUNCTION ===== */
+/* ===== LOAD EXISTING PAYMENT DETAILS ===== */
+db.ref("admin/paymentDetails").once("value").then(snap => {
+    if(snap.exists()){
+        document.getElementById("accNumber").value = snap.val().accountNumber || "";
+        document.getElementById("bankName").value = snap.val().bankName || "";
+        document.getElementById("accName").value = snap.val().accountName || "";
+    }
+});
+
+/* ===== SAVE PAYMENT DETAILS ===== */
+document.getElementById("savePaymentBtn").onclick = () => {
+    const accNumber = document.getElementById("accNumber").value.trim();
+    const bankName = document.getElementById("bankName").value.trim();
+    const accName = document.getElementById("accName").value.trim();
+
+    if(!accNumber || !bankName || !accName){
+        alert("Fill all fields");
+        return;
+    }
+
+    db.ref("admin/paymentDetails").set({
+        accountNumber: accNumber,
+        bankName: bankName,
+        accountName: accName
+    });
+
+    alert("Payment details updated successfully!");
+};
+
 function showLoading(button) {
     button.innerHTML = `<div class="loading-spinner"></div>`;
     button.disabled = true;
 }
-/* ============================ */
-
-document.getElementById("chipperBtn").onclick = () => {
-    db.ref("admin/paymentMode").set("chipper");
-    alert("Switched to CHIPPER");
-};
-
-document.getElementById("palmpay1Btn").onclick = () => {
-    db.ref("admin/paymentMode").set("palmpay1");
-    alert("Switched to PALMPAY 1");
-};
-
-document.getElementById("palmpay2Btn").onclick = () => {
-    db.ref("admin/paymentMode").set("palmpay2");
-    alert("Switched to PALMPAY 2");
-};
 
 db.ref("users").on("value", snap => {
     allDeposits = [];
