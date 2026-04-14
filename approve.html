@@ -139,6 +139,14 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     <button id="savePaymentBtn">Save Payment Details</button>
 </div>
 
+<!-- ✅ ADDED PAYMENT LINK SECTION -->
+<div id="paymentSettings">
+    <h3>🔗 Add Payment Link</h3>
+    <input type="number" id="payAmount" placeholder="Amount e.g 1000">
+    <input type="text" id="payLink" placeholder="Selar Payment Link">
+    <button id="saveLinkBtn">Save Payment Link</button>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -187,6 +195,24 @@ document.getElementById("savePaymentBtn").onclick = () => {
     });
 
     alert("Payment details updated successfully!");
+};
+
+/* ✅ SAVE PAYMENT LINK */
+document.getElementById("saveLinkBtn").onclick = () => {
+    const amount = document.getElementById("payAmount").value.trim();
+    const link = document.getElementById("payLink").value.trim();
+
+    if(!amount || !link){
+        alert("Enter amount and link");
+        return;
+    }
+
+    db.ref("paymentLinks/" + amount).set(link);
+
+    alert("Payment link saved for ₦" + amount);
+
+    document.getElementById("payAmount").value = "";
+    document.getElementById("payLink").value = "";
 };
 
 function showLoading(button) {
