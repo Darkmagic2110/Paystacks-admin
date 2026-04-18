@@ -64,13 +64,13 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
 #deleteAllBtn { background:red; color:white; }
 #blockBtn { background:orange; color:white; }
 
-/* 🔥 PAYMENT SETTINGS */
 #paymentSettings {
     margin-top: 25px;
     background: #111;
     padding: 15px;
     border-radius: 10px;
 }
+
 #paymentSettings input {
     width: 100%;
     padding: 10px;
@@ -78,6 +78,7 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     border-radius: 6px;
     border: none;
 }
+
 #savePaymentBtn {
     margin-top: 10px;
     width: 100%;
@@ -98,10 +99,6 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     font-size:16px;
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
 .loading-spinner {
     border: 3px solid #444;
     border-top: 3px solid white;
@@ -110,6 +107,11 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     height: 16px;
     animation: spin 1s linear infinite;
     margin: auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 </style>
 </head>
@@ -130,21 +132,15 @@ h1 { color: red; text-align:center; margin-bottom:20px; }
     <button id="blockBtn">Block Deposits</button>
 </div>
 
-<!-- 🔥 PAYMENT SETTINGS -->
+<!-- PAYMENT SETTINGS -->
 <div id="paymentSettings">
-    <h3>💳 Set Payment Details</h3>
+    <h3>💳 Set Payment Details (MULTIPLE BANKS)</h3>
+
     <input type="text" id="accNumber" placeholder="Account Number">
     <input type="text" id="bankName" placeholder="Bank Name">
     <input type="text" id="accName" placeholder="Account Name">
-    <button id="savePaymentBtn">Save Payment Details</button>
-</div>
 
-<!-- ✅ ADDED PAYMENT LINK SECTION -->
-<div id="paymentSettings">
-    <h3>🔗 Add Payment Link</h3>
-    <input type="number" id="payAmount" placeholder="Amount e.g 1000">
-    <input type="text" id="payLink" placeholder="Selar Payment Link">
-    <button id="saveLinkBtn">Save Payment Link</button>
+    <button id="savePaymentBtn">Save Payment Details</button>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -160,66 +156,60 @@ const firebaseConfig = {
     appId: "1:384386108287:android:d238a5ec8068d9bb9be84a",
     databaseURL: "https://bets-d795d-default-rtdb.firebaseio.com"
 };
-firebase.initializeApp(firebaseConfig);
 
+firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
 const depositList = document.getElementById("depositList");
 const searchInput = document.getElementById("searchInput");
 
 let allDeposits = [];
 
-/* ===== LOAD EXISTING PAYMENT DETAILS ===== */
-db.ref("admin/paymentDetails").once("value").then(snap => {
-    if(snap.exists()){
-        document.getElementById("accNumber").value = snap.val().accountNumber || "";
-        document.getElementById("bankName").value = snap.val().bankName || "";
-        document.getElementById("accName").value = snap.val().accountName || "";
+/* LOAD EXISTING PAYMENT DETAILS (SHOW FIRST ONE) */
+db.ref("admin/paymentMethods").once("value").then(snap => {
+    if (snap.exists()) {
+        const first = Object.values(snap.val())[0];
+
+        if (first) {
+            document.getElementById("accNumber").value = first.accountNumber || "";
+            document.getElementById("bankName").value = first.bankName || "";
+            document.getElementById("accName").value = first.accountName || "";
+        }
     }
 });
 
-/* ===== SAVE PAYMENT DETAILS ===== */
+/* SAVE NEW PAYMENT METHOD (MULTIPLE ACCOUNTS) */
 document.getElementById("savePaymentBtn").onclick = () => {
+
     const accNumber = document.getElementById("accNumber").value.trim();
     const bankName = document.getElementById("bankName").value.trim();
     const accName = document.getElementById("accName").value.trim();
 
-    if(!accNumber || !bankName || !accName){
+    if (!accNumber || !bankName || !accName) {
         alert("Fill all fields");
         return;
     }
 
-    db.ref("admin/paymentDetails").set({
+    db.ref("admin/paymentMethods").push({
         accountNumber: accNumber,
         bankName: bankName,
         accountName: accName
     });
 
-    alert("Payment details updated successfully!");
+    alert("Payment details saved!");
+
+    document.getElementById("accNumber").value = "";
+    document.getElementById("bankName").value = "";
+    document.getElementById("accName").value = "";
 };
 
-/* ✅ SAVE PAYMENT LINK */
-document.getElementById("saveLinkBtn").onclick = () => {
-    const amount = document.getElementById("payAmount").value.trim();
-    const link = document.getElementById("payLink").value.trim();
-
-    if(!amount || !link){
-        alert("Enter amount and link");
-        return;
-    }
-
-    db.ref("paymentLinks/" + amount).set(link);
-
-    alert("Payment link saved for ₦" + amount);
-
-    document.getElementById("payAmount").value = "";
-    document.getElementById("payLink").value = "";
-};
-
+/* LOADING ANIMATION */
 function showLoading(button) {
     button.innerHTML = `<div class="loading-spinner"></div>`;
     button.disabled = true;
 }
 
+/* LOAD USERS + DEPOSITS */
 db.ref("users").on("value", snap => {
     allDeposits = [];
 
@@ -227,12 +217,12 @@ db.ref("users").on("value", snap => {
         const uid = userSnap.key;
         const userData = userSnap.val();
 
-        if(!userData.transactions) return;
+        if (!userData.transactions) return;
 
         Object.keys(userData.transactions).forEach(txKey => {
             const tx = userData.transactions[txKey];
 
-            if(tx.type === "deposit" && (!tx.status || tx.status !== "approved")){
+            if (tx.type === "deposit" && tx.status !== "approved") {
                 allDeposits.push({ uid, txKey, tx, userData });
             }
         });
@@ -251,7 +241,7 @@ function renderDeposits() {
     allDeposits.forEach(({uid, txKey, tx, userData}) => {
 
         const name = (tx.accountName || "").toLowerCase();
-        if(!name.includes(query)) return;
+        if (!name.includes(query)) return;
 
         const time = tx.time ? new Date(tx.time).toLocaleString() : "No time";
 
@@ -275,16 +265,12 @@ function renderDeposits() {
 
         approveBtn.onclick = () => {
             showLoading(approveBtn);
-            setTimeout(() => {
-                approveDeposit(uid, txKey, tx);
-            }, 1000);
+            setTimeout(() => approveDeposit(uid, txKey, tx), 1000);
         };
 
         declineBtn.onclick = () => {
             showLoading(declineBtn);
-            setTimeout(() => {
-                deleteDeposit(uid, txKey);
-            }, 1000);
+            setTimeout(() => deleteDeposit(uid, txKey), 1000);
         };
 
         depositList.appendChild(div);
@@ -293,6 +279,7 @@ function renderDeposits() {
 
 searchInput.addEventListener("input", renderDeposits);
 
+/* APPROVE */
 function approveDeposit(uid, txKey, tx) {
     const userRef = db.ref("users/" + uid);
 
@@ -304,12 +291,14 @@ function approveDeposit(uid, txKey, tx) {
     db.ref(`users/${uid}/transactions/${txKey}/status`).set("approved");
 }
 
+/* DELETE */
 function deleteDeposit(uid, txKey) {
     db.ref(`users/${uid}/transactions/${txKey}`).remove();
 }
 
+/* BULK */
 document.getElementById("approveAllBtn").onclick = () => {
-    if(!confirm("Approve ALL deposits?")) return;
+    if (!confirm("Approve ALL deposits?")) return;
 
     allDeposits.forEach(({uid, txKey, tx}) => {
         approveDeposit(uid, txKey, tx);
@@ -317,13 +306,14 @@ document.getElementById("approveAllBtn").onclick = () => {
 };
 
 document.getElementById("deleteAllBtn").onclick = () => {
-    if(!confirm("Delete ALL deposits?")) return;
+    if (!confirm("Delete ALL deposits?")) return;
 
     allDeposits.forEach(({uid, txKey}) => {
         deleteDeposit(uid, txKey);
     });
 };
 
+/* BLOCK SYSTEM */
 function updateBlockBtn() {
     db.ref("admin/blockDeposit").once("value").then(snap => {
         const blocked = snap.val() === true;
