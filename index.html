@@ -99,18 +99,13 @@ button:hover {
 <body>
 
 <h1>Admin Dashboard</h1>
-
+<!-- Approve Page Button -->
 <button id="approvePageBtn">✅ Approve Page</button>
 
 <h1>Admin: Set Paystack Keys</h1>
 <input type="text" id="publicKey" placeholder="Enter Paystack Public Key" />
 <input type="password" id="secretKey" placeholder="Enter Paystack Secret Key" />
 <button id="saveBtn">💾 Save Keys</button>
-
-<!-- ✅ ADDED Flutterwave Section -->
-<h1>Admin: Set Flutterwave Key</h1>
-<input type="text" id="flutterPublicKey" placeholder="Enter Flutterwave Public Key (FLWPUBK-...)" />
-<button id="saveFlutterBtn">💾 Save Flutterwave Key</button>
 
 <hr style="margin:20px 0; border-color: #444;" />
 
@@ -126,7 +121,6 @@ button:hover {
 <button id="loadHistoryBtn">📜 Load History</button>
 
 <div id="status"></div>
-
 <div id="historyBox">
     <h3>Transactions</h3>
     <div id="historyList"></div>
@@ -134,12 +128,15 @@ button:hover {
 
 <div id="toast"></div>
 
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-
+/* ---------------------------
+   Firebase initialization
+--------------------------- */
 const firebaseConfig = {
     apiKey: "AIzaSyDvFDByPPo9zgwKLdPaREz1OVMQCXmPfrs",
     authDomain: "bets-d795d.firebaseapp.com",
@@ -149,103 +146,132 @@ const firebaseConfig = {
     appId: "1:384386108287:android:d238a5ec8068d9bb9be84a",
     databaseURL: "https://bets-d795d-default-rtdb.firebaseio.com"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+/* ---------------------------
+   Toast helper
+--------------------------- */
 function toast(msg) {
     const t = document.getElementById("toast");
     t.innerHTML = msg;
     t.className = "show";
-    setTimeout(() => {
-        t.className = t.className.replace("show", "");
-    }, 3000);
+    setTimeout(() => { t.className = t.className.replace("show", ""); }, 3000);
 }
 
+/* ---------------------------
+   Admin auth check
+--------------------------- */
 firebase.auth().onAuthStateChanged(user => {
     if (!user) {
-        window.location.href = "login.html";
+        window.location.href = "login.html"; // redirect to login
         return;
     }
 });
 
+/* ---------------------------
+   Approve Page navigation
+--------------------------- */
 document.getElementById("approvePageBtn").onclick = () => {
     window.location.href = "approve.html";
 };
 
-/* Paystack Save */
-
+/* ---------------------------
+   Save Paystack keys
+--------------------------- */
 document.getElementById("saveBtn").onclick = () => {
-
-    const publicKey =
-        document.getElementById("publicKey").value.trim();
-
-    const secretKey =
-        document.getElementById("secretKey").value.trim();
-
-    if (!publicKey || !secretKey)
-        return toast("Both keys are required");
-
-    db.ref("settings/paystackKeys")
-    .set({
-        public: publicKey,
-        secret: secretKey
-    })
-    .then(() => {
-
-        document.getElementById("status").innerHTML =
-        "✅ Paystack keys saved successfully!";
-
-        toast("Paystack keys updated");
-
-    })
-    .catch(err => {
-
-        document.getElementById("status").innerHTML =
-        "❌ Error saving Paystack keys";
-
-        toast(err.message);
-
-    });
-
+    const publicKey = document.getElementById("publicKey").value.trim();
+    const secretKey = document.getElementById("secretKey").value.trim();
+    if (!publicKey || !secretKey) return toast("Both keys are required");
+    db.ref("settings/paystackKeys").set({ public: publicKey, secret: secretKey })
+    .then(() => { document.getElementById("status").innerHTML = "✅ Keys saved successfully!"; toast("Keys updated"); })
+    .catch(err => { document.getElementById("status").innerHTML = "❌ Error saving keys"; toast(err.message); });
 };
 
-/* ✅ Flutterwave Save (NEW) */
+/* ---------------------------
+   Add coins to user
+--------------------------- */
+document.getElementById("addCoinsBtn").onclick = () => {
+    const email = document.getElementById("userEmail").value.trim();
+    const amount = parseInt(document.getElementById("coinAmount").value);
+    if (!email || !amount || amount < 1) return toast("Enter valid email and amount");
 
-document.getElementById("saveFlutterBtn").onclick = () => {
+    db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
+        if (!snapshot.exists()) return toast("User not found!");
+        snapshot.forEach(userSnap => {
+            const userRef = db.ref("users/" + userSnap.key + "/balance");
+            userRef.transaction(current => (current || 0) + amount);
+            toast(`✅ Added ${amount} coins to ${email}`);
 
-    const flutterKey =
-        document.getElementById("flutterPublicKey")
-        .value.trim();
-
-    if (!flutterKey)
-        return toast("Enter Flutterwave public key");
-
-    db.ref("settings/flutterwaveKeys")
-    .set({
-        public: flutterKey
-    })
-    .then(() => {
-
-        document.getElementById("status").innerHTML =
-        "✅ Flutterwave key saved successfully!";
-
-        toast("Flutterwave key updated");
-
-    })
-    .catch(err => {
-
-        document.getElementById("status").innerHTML =
-        "❌ Error saving Flutterwave key";
-
-        toast(err.message);
-
-    });
-
+            // Also record this as deposit transaction
+            const txRef = db.ref("users/" + userSnap.key + "/transactions");
+            txRef.push({
+                type: "deposit",
+                coins: amount,
+                amount: amount,
+                ref: "DEP-" + Date.now(),
+                time: Date.now(),
+                email: email,
+                uid: userSnap.key
+            });
+        });
+    }).catch(err => { toast("❌ Error adding coins: " + err.message); });
 };
 
-/* (Your existing Add Coins and History code stays unchanged) */
+/* ---------------------------
+   Load user transaction history
+--------------------------- */
+document.getElementById("loadHistoryBtn").onclick = () => {
+    const email = document.getElementById("historyEmail").value.trim();
+    if (!email) return toast("Enter a valid email");
 
+    db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
+        if (!snapshot.exists()) return toast("User not found");
+
+        snapshot.forEach(userSnap => {
+            const transactionsRef = db.ref("users/" + userSnap.key + "/transactions");
+            transactionsRef.once("value").then(txSnap => {
+                let txArr = [];
+                txSnap.forEach(child => { txArr.push(child.val()); });
+
+                // Sort latest first
+                txArr.sort((a,b) => b.time - a.time);
+
+                const historyList = document.getElementById("historyList");
+                historyList.innerHTML = "";
+                txArr.forEach(tx => {
+                    const d = new Date(tx.time).toLocaleString();
+                    let title = "";
+                    let amount = "";
+                    if(tx.type === "deposit") {
+                        title = `+${tx.coins} Coins (DEPOSIT)`;
+                        amount = `₦${tx.amount}`;
+                    } else if(tx.type === "bet" || tx.type === "deduction") {
+                        title = `${tx.coins < 0 ? tx.coins : "+"+tx.coins} Coins (DEDUCTION${tx.game ? " - " + tx.game : ""})`;
+                        amount = tx.amount ? `₦${tx.amount}` : "";
+                    } else {
+                        title = `${tx.coins} Coins (${tx.type.toUpperCase()})`;
+                        amount = tx.amount ? `₦${tx.amount}` : "";
+                    }
+                    historyList.innerHTML += `
+                        <div class="history-item">
+                            <div class="history-left">
+                                <div class="history-title">${title}</div>
+                                <div class="history-sub">${tx.ref || ""}</div>
+                                <div class="history-sub">${d}</div>
+                            </div>
+                            <div class="history-right">
+                                <div>${tx.coins > 0 ? "+"+tx.coins : tx.coins}</div>
+                                <div class="history-naira">${amount}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                toast(`✅ Loaded ${txArr.length} transactions for ${email}`);
+            });
+        });
+    }).catch(err => { toast("❌ Error: " + err.message); });
+};
 </script>
 
 </body>
