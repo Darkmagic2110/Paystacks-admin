@@ -123,151 +123,190 @@ const firebaseConfig = {
 };
 
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-
 const db = firebase.database();
 
-let foundUID = null;
-let foundUser = null;
+let userUID = null;
+let refCode = null;
+let withdrawData = {};
 
-/* ================= SEARCH USER (FIXED) ================= */
-function searchUser() {
+/* ================= LOGIN ================= */
+firebase.auth().onAuthStateChanged(user => {
+    if (!user) return window.location.href = "login.html";
 
-    const email = document.getElementById("emailInput").value.trim().toLowerCase();
+    userUID = user.uid;
+
+    db.ref("users/" + userUID).once("value").then(snap => {
+        const data = snap.val() || {};
+        refCode = data.refCode || "";
+
+        document.getElementById("refLink").innerText =
+            window.location.origin + "/index.html?ref=" + refCode;
+
+        loadDashboard();
+        loadWithdrawals(); // 🔥 NEW
+    });
+});
+
+/* ================= DASHBOARD ================= */
+function loadDashboard() {
+
+    db.ref("users/" + userUID + "/affiliateBalance").on("value", snap => {
+        document.getElementById("balance").innerText =
+            "₦" + (snap.val() || 0).toFixed(2);
+    });
+
+    db.ref("users/" + userUID + "/totalEarned").on("value", snap => {
+        document.getElementById("totalEarned").innerText =
+            "₦" + (snap.val() || 0).toFixed(2);
+    });
 
     db.ref("users").once("value").then(snap => {
-
-        foundUID = null;
-        foundUser = null;
-
-        let totalRef = 0;
+        let count = 0;
+        let list = [];
 
         snap.forEach(child => {
-            const u = child.val();
-
-            if (!u) return;
-
-            // count referrals safely
-            if (u.referredBy) {
-                totalRef++;
-            }
-
-            if (u.email === email) {
-
-                foundUID = child.key;
-                foundUser = u;
-
-                const affiliate = u.affiliate || {
-                    availableBalance: 0,
-                    totalEarned: 0
-                };
-
-                document.getElementById("name").innerText = u.name || "";
-                document.getElementById("email").innerText = u.email || "";
-                document.getElementById("refCode").innerText = u.refCode || "";
-
-                document.getElementById("balance").innerText =
-                    "₦" + (affiliate.availableBalance || 0);
-
-                document.getElementById("earned").innerText =
-                    "₦" + (affiliate.totalEarned || 0);
-
-                document.getElementById("totalRef").innerText = totalRef;
-
-                document.getElementById("result").style.display = "block";
+            const u = child.val() || {};
+            if (u.referredBy === refCode) {
+                count++;
+                list.push(u);
             }
         });
 
-        if (!foundUID) {
-            alert("User not found");
-        }
+        document.getElementById("totalRef").innerText = count;
+        window.referredUsers = list;
     });
 }
 
-/* ================= ADD MONEY (FIXED) ================= */
-function addMoney() {
-
-    const amount = Number(document.getElementById("amount").value);
-
-    if (!foundUID || !foundUser) {
-        alert("Search user first");
-        return;
-    }
-
-    if (!amount || amount <= 0) {
-        alert("Enter valid amount");
-        return;
-    }
-
-    const currentAffiliate = foundUser.affiliate || {
-        availableBalance: 0,
-        totalEarned: 0
-    };
-
-    const newBalance = (currentAffiliate.availableBalance || 0) + amount;
-    const newEarned = (currentAffiliate.totalEarned || 0) + amount;
-
-    db.ref("users/" + foundUID + "/affiliate").set({
-        availableBalance: newBalance,
-        totalEarned: newEarned
-    }).then(() => {
-        alert("Money added successfully ✔");
-
-        document.getElementById("balance").innerText = "₦" + newBalance;
-        document.getElementById("earned").innerText = "₦" + newEarned;
-    });
-}
-
-/* ================= ADMIN WITHDRAWALS ================= */
+/* ================= WITHDRAWALS (NEW ADMIN VIEW) ================= */
 function loadWithdrawals() {
-    const tbody = document.getElementById("withdrawTableBody");
-    tbody.innerHTML = "Loading...";
+    const box = document.getElementById("withdrawList");
 
-    db.ref("withdrawals").orderByChild("time").once("value").then(snap => {
-        tbody.innerHTML = "";
-        
-        if (!snap.exists()) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:15px;">No withdrawals yet</td></tr>`;
-            return;
-        }
+    db.ref("withdrawals").on("value", snap => {
+        box.innerHTML = "";
+
+        let data = [];
 
         snap.forEach(child => {
-            const w = child.val();
-            const key = child.key;
-            const date = new Date(w.time).toLocaleString();
-            const status = w.status || "pending";
+            data.push(child.val());
+        });
 
-            tbody.innerHTML += `
-                <tr id="w-${key}">
-                    <td>${w.email || ''}</td>
-                    <td>₦${w.amount || 0}</td>
-                    <td>${w.bank || ''}</td>
-                    <td>${w.accNum || ''}</td>
-                    <td>${w.accName || ''}</td>
-                    <td>${date}</td>
-                    <td><span style="color:${status==='approved'?'lime':status==='declined'?'red':'#ffaa00'}">${status}</span></td>
-                    <td>
-                        ${status==='pending' ? 
-                        `<button onclick="updateWithdraw('${key}','approved')" style="padding:5px 8px;background:lime;color:#000;border:none;border-radius:5px;cursor:pointer;">Approve</button>
-                         <button onclick="updateWithdraw('${key}','declined')" style="padding:5px 8px;background:red;color:#fff;border:none;border-radius:5px;cursor:pointer;margin-left:5px;">Decline</button>`
-                        : '---'}
-                    </td>
-                </tr>
+        data.reverse().forEach(w => {
+
+            const date = w.time ? new Date(w.time).toLocaleString() : "N/A";
+
+            box.innerHTML += `
+                <div class="card" style="border-left:4px solid red;">
+                    <b>${w.email || "No Email"}</b><br><br>
+
+                    Amount: ₦${w.amount}<br>
+                    Bank: ${w.bank}<br>
+                    Account No: ${w.accNum}<br>
+                    Account Name: ${w.accName}<br>
+                    Status: <b>${w.status}</b><br>
+                    Time: ${date}
+                </div>
             `;
         });
     });
 }
 
-function updateWithdraw(key, newStatus) {
-    if (!confirm(`Mark this withdrawal as ${newStatus}?`)) return;
-    
-    db.ref("withdrawals/" + key + "/status").set(newStatus).then(() => {
-        alert(`Withdrawal ${newStatus} ✔`);
-        loadWithdrawals(); // refresh table
+/* ================= COPY ================= */
+function copyLink() {
+    navigator.clipboard.writeText(document.getElementById("refLink").innerText);
+    alert("Copied!");
+}
+
+/* ================= USERS TOGGLE ================= */
+function toggleUsers() {
+    const box = document.getElementById("userList");
+    const btn = event.target;
+
+    if (box.style.display === "none") {
+        box.innerHTML = "";
+
+        (window.referredUsers || []).forEach(u => {
+            box.innerHTML += `
+                <div class="user">
+                    <b>${u.name}</b><br>
+                    ${u.email}
+                </div>
+            `;
+        });
+
+        box.style.display = "block";
+        btn.innerText = "Hide Referred Emails";
+    } else {
+        box.style.display = "none";
+        btn.innerText = "Show Referred Emails";
+    }
+}
+
+/* ================= WITHDRAW FLOW ================= */
+function withdraw() {
+    db.ref("users/" + userUID + "/affiliateBalance").once("value").then(snap => {
+        const bal = snap.val() || 0;
+
+        if (bal < 5000) {
+            alert("Minimum withdrawal is ₦5,000");
+            return;
+        }
+
+        document.getElementById("withdrawModal").style.display = "flex";
     });
 }
 
-// Auto load withdrawals when admin page opens
-window.addEventListener('load', loadWithdrawals);
+function closeWithdraw() {
+    document.getElementById("withdrawModal").style.display = "none";
+}
+
+function submitWithdraw() {
+    const amount = Number(document.getElementById("withdrawAmount").value);
+    const bank = document.getElementById("bankName").value;
+    const accNum = document.getElementById("accNumber").value;
+    const accName = document.getElementById("accName").value;
+
+    if (!amount || amount < 5000) {
+        alert("Minimum ₦5,000");
+        return;
+    }
+
+    db.ref("users/" + userUID + "/affiliateBalance")
+        .transaction(v => (v || 0) - amount);
+
+    withdrawData = { amount, bank, accNum, accName };
+
+    document.getElementById("withdrawModal").style.display = "none";
+    document.getElementById("confirmModal").style.display = "flex";
+}
+
+function closeConfirm() {
+    document.getElementById("confirmModal").style.display = "none";
+}
+
+/* ================= CONFIRM ================= */
+function copyAndRedirect() {
+    const email = firebase.auth().currentUser.email;
+
+    const text =
+`I have a pending withdrawal
+Email: ${email}
+Amount: ₦${withdrawData.amount}
+Bank: ${withdrawData.bank}
+Account: ${withdrawData.accNum}
+Name: ${withdrawData.accName}`;
+
+    navigator.clipboard.writeText(text);
+
+    db.ref("withdrawals").push({
+        userId: userUID,
+        email,
+        ...withdrawData,
+        time: Date.now(),
+        status: "instant"
+    });
+
+    window.location.href = "https://t.me/darkmagic01";
+}
 </script>
 
 </body>
