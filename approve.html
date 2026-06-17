@@ -1,336 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin - Deposit Approval</title>
+<meta charset="UTF-8">
+<title>Admin Referral Panel</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 
 <style>
 body {
-    background: black;
-    color: white;
-    font-family: 'Poppins', sans-serif;
-    padding: 10px;
+    margin:0;
+    font-family:'Poppins',sans-serif;
+    background:#0a0a0a;
+    color:white;
+    padding:20px;
 }
-h1 { color: red; text-align:center; margin-bottom:20px; }
 
-.deposit-item {
+.container { max-width:500px; margin:auto; }
+
+h1 { text-align:center; color:red; }
+
+.card {
     background:#111;
+    padding:15px;
+    border-radius:12px;
+    margin-bottom:15px;
+    border:1px solid #222;
+}
+
+input {
+    width:100%;
     padding:12px;
-    border-radius:10px;
-    margin:10px 0;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-}
-
-.deposit-left { flex:1; text-align:left; }
-.deposit-right { display:flex; gap:8px; }
-
-.deposit-right button {
-    padding:6px 12px;
+    margin:6px 0;
+    border-radius:8px;
     border:none;
-    border-radius:6px;
-    font-weight:bold;
-    cursor:pointer;
+    background:#1a1a1a;
+    color:white;
 }
 
-.approve-btn { background:green; color:white; }
-.decline-btn { background:red; color:white; }
-
-.time {
-    font-size:12px;
-    color:#aaa;
-}
-
-#bulkButtons {
-    margin-top:20px;
-    display:flex;
-    justify-content:center;
-    gap:15px;
-}
-
-#bulkButtons button {
-    padding:10px 20px;
-    font-weight:bold;
-    border:none;
-    border-radius:6px;
-    cursor:pointer;
-}
-
-#approveAllBtn { background:green; color:white; }
-#deleteAllBtn { background:red; color:white; }
-#blockBtn { background:orange; color:white; }
-
-/* PAYMENT SETTINGS */
-#paymentSettings {
-    margin-top: 25px;
-    background: #111;
-    padding: 15px;
-    border-radius: 10px;
-}
-#paymentSettings input {
-    width: 100%;
-    padding: 10px;
-    margin-top: 8px;
-    border-radius: 6px;
-    border: none;
-}
-#savePaymentBtn {
-    margin-top: 10px;
-    width: 100%;
-    padding: 10px;
-    background: cyan;
-    color: black;
-    font-weight: bold;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-#searchInput {
-    padding:8px 12px;
-    width:300px;
-    border-radius:6px;
-    border:none;
-    font-size:16px;
-}
-
-/* NEW: ACCOUNT LIST */
-.account-item {
-    background:#111;
+button {
+    width:100%;
     padding:12px;
-    border-radius:10px;
-    margin:10px 0;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-}
-.account-left { text-align:left; }
-.account-right button {
+    border:none;
+    border-radius:8px;
     background:red;
     color:white;
-    border:none;
-    padding:6px 12px;
-    border-radius:6px;
+    font-weight:bold;
     cursor:pointer;
+    margin-top:8px;
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+.stat {
+    display:flex;
+    justify-content:space-between;
+    margin:6px 0;
 }
-.loading-spinner {
-    border: 3px solid #444;
-    border-top: 3px solid white;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    animation: spin 1s linear infinite;
-    margin: auto;
+
+.stat span:last-child {
+    color:lime;
+    font-weight:bold;
+}
+
+.userBox {
+    background:#1a1a1a;
+    padding:10px;
+    border-radius:8px;
+    margin-top:10px;
+    font-size:13px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>Admin - Deposit Approvals</h1>
+<div class="container">
 
-<div style="text-align:center; margin-bottom:20px;">
-    <input type="text" id="searchInput" placeholder="Search by Account Name">
+<h1>ADMIN PANEL</h1>
+
+<div class="card">
+    <h3>Search User</h3>
+    <input id="emailInput" placeholder="Enter user email">
+    <button onclick="searchUser()">Search</button>
 </div>
 
-<div id="depositList"></div>
+<div class="card" id="result" style="display:none;">
 
-<div id="bulkButtons">
-    <button id="approveAllBtn">Approve All</button>
-    <button id="deleteAllBtn">Delete All</button>
-    <button id="blockBtn">Block Deposits</button>
+    <h3>User Info</h3>
+
+    <div class="stat"><span>Name</span><span id="name"></span></div>
+    <div class="stat"><span>Email</span><span id="email"></span></div>
+    <div class="stat"><span>Referral Code</span><span id="refCode"></span></div>
+
+    <hr>
+
+    <div class="stat"><span>Total Referrals</span><span id="totalRef"></span></div>
+    <div class="stat"><span>Affiliate Balance</span><span id="balance"></span></div>
+    <div class="stat"><span>Total Earned</span><span id="earned"></span></div>
+
+    <hr>
+
+    <h3>Add Money</h3>
+    <input id="amount" placeholder="Enter amount">
+
+    <button onclick="addMoney()">Add to Affiliate</button>
+
 </div>
 
-<!-- PAYMENT SETTINGS -->
-<div id="paymentSettings">
-    <h3>💳 Set Payment Details</h3>
-    <input type="text" id="accNumber" placeholder="Account Number">
-    <input type="text" id="bankName" placeholder="Bank Name">
-    <input type="text" id="accName" placeholder="Account Name">
-    <button id="savePaymentBtn">Save Payment Details</button>
 </div>
-
-<!-- NEW: SHOW ALL PAYMENT ACCOUNTS -->
-<div id="savedAccountsBox" style="margin-top:20px;">
-    <h3>📋 Saved Payment Accounts</h3>
-    <div id="accountsList"></div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
 const firebaseConfig = {
     apiKey: "AIzaSyDvFDByPPo9zgwKLdPaREz1OVMQCXmPfrs",
     authDomain: "bets-d795d.firebaseapp.com",
+    databaseURL: "https://bets-d795d-default-rtdb.firebaseio.com",
     projectId: "bets-d795d",
     storageBucket: "bets-d795d.appspot.com",
     messagingSenderId: "384386108287",
-    appId: "1:384386108287:android:d238a5ec8068d9bb9be84a",
-    databaseURL: "https://bets-d795d-default-rtdb.firebaseio.com"
+    appId: "1:384386108287:android:d238a5ec8068d9bb9be84a"
 };
+
 firebase.initializeApp(firebaseConfig);
-
 const db = firebase.database();
-const depositList = document.getElementById("depositList");
-const searchInput = document.getElementById("searchInput");
-const accountsList = document.getElementById("accountsList");
 
-let allDeposits = [];
+let foundUID = null;
 
-/* SAVE PAYMENT ACCOUNT */
-document.getElementById("savePaymentBtn").onclick = () => {
-    const accNumber = document.getElementById("accNumber").value.trim();
-    const bankName = document.getElementById("bankName").value.trim();
-    const accName = document.getElementById("accName").value.trim();
+/* ================= SEARCH USER ================= */
+function searchUser() {
 
-    if(!accNumber || !bankName || !accName){
-        alert("Fill all fields");
-        return;
-    }
+    const email = document.getElementById("emailInput").value.trim().toLowerCase();
 
-    db.ref("admin/paymentMethods").push({
-        accountNumber: accNumber,
-        bankName: bankName,
-        accountName: accName
-    });
+    db.ref("users").once("value").then(snap => {
 
-    alert("Payment account added!");
+        foundUID = null;
 
-    document.getElementById("accNumber").value = "";
-    document.getElementById("bankName").value = "";
-    document.getElementById("accName").value = "";
-};
+        snap.forEach(child => {
+            const u = child.val();
 
-/* LOAD PAYMENT ACCOUNTS */
-db.ref("admin/paymentMethods").on("value", snap => {
-    accountsList.innerHTML = "";
+            if (u.email === email) {
+                foundUID = child.key;
 
-    snap.forEach(child => {
-        const data = child.val();
-        const key = child.key;
+                document.getElementById("name").innerText = u.name || "";
+                document.getElementById("email").innerText = u.email || "";
+                document.getElementById("refCode").innerText = u.refCode || "";
 
-        const div = document.createElement("div");
-        div.className = "account-item";
+                // balances
+                document.getElementById("balance").innerText =
+                    "₦" + ((u.affiliate && u.affiliate.availableBalance) || 0);
 
-        div.innerHTML = `
-            <div class="account-left">
-                <strong>${data.bankName}</strong><br>
-                ${data.accountNumber}<br>
-                ${data.accountName}
-            </div>
-            <div class="account-right">
-                <button onclick="deleteAccount('${key}')">Delete</button>
-            </div>
-        `;
+                document.getElementById("earned").innerText =
+                    "₦" + ((u.affiliate && u.affiliate.totalEarned) || 0);
 
-        accountsList.appendChild(div);
-    });
-});
+                // referrals count
+                let count = 0;
 
-/* DELETE ACCOUNT */
-function deleteAccount(key){
-    if(!confirm("Delete this account?")) return;
-    db.ref("admin/paymentMethods/" + key).remove();
-}
+                snap.forEach(x => {
+                    const d = x.val();
+                    if (d.referredBy === u.refCode) count++;
+                });
 
-/* LOAD DEPOSITS */
-db.ref("users").on("value", snap => {
-    allDeposits = [];
+                document.getElementById("totalRef").innerText = count;
 
-    snap.forEach(userSnap => {
-        const uid = userSnap.key;
-        const userData = userSnap.val();
-
-        if(!userData.transactions) return;
-
-        Object.keys(userData.transactions).forEach(txKey => {
-            const tx = userData.transactions[txKey];
-
-            if(tx.type === "deposit" && tx.status !== "approved"){
-                allDeposits.push({ uid, txKey, tx, userData });
+                document.getElementById("result").style.display = "block";
             }
         });
-    });
 
-    renderDeposits();
-});
-
-function renderDeposits() {
-    depositList.innerHTML = "";
-
-    const query = searchInput.value.toLowerCase();
-
-    allDeposits.sort((a,b)=> (b.tx.time || 0) - (a.tx.time || 0));
-
-    allDeposits.forEach(({uid, txKey, tx, userData}) => {
-
-        const name = (tx.accountName || "").toLowerCase();
-        if(!name.includes(query)) return;
-
-        const time = tx.time ? new Date(tx.time).toLocaleString() : "No time";
-
-        const div = document.createElement("div");
-        div.className = "deposit-item";
-
-        div.innerHTML = `
-            <div class="deposit-left">
-                <strong>${tx.accountName || userData.email || uid}</strong><br>
-                Amount: ₦${tx.amount} (${tx.coins} Coins)<br>
-                <span class="time">🕒 ${time}</span>
-            </div>
-            <div class="deposit-right">
-                <button class="approve-btn">Approve</button>
-                <button class="decline-btn">Delete</button>
-            </div>
-        `;
-
-        const approveBtn = div.querySelector(".approve-btn");
-        const declineBtn = div.querySelector(".decline-btn");
-
-        approveBtn.onclick = () => approveDeposit(uid, txKey, tx);
-        declineBtn.onclick = () => deleteDeposit(uid, txKey);
-
-        depositList.appendChild(div);
+        if (!foundUID) {
+            alert("User not found");
+        }
     });
 }
 
-searchInput.addEventListener("input", renderDeposits);
+/* ================= ADD MONEY ================= */
+function addMoney() {
 
-/* APPROVE */
-function approveDeposit(uid, txKey, tx) {
-    const userRef = db.ref("users/" + uid);
+    const amount = Number(document.getElementById("amount").value);
 
-    userRef.child("balance").once("value").then(snap => {
-        let current = snap.val() || 0;
-        userRef.child("balance").set(current + tx.coins);
-    });
+    if (!foundUID) return alert("Search user first");
+    if (!amount) return alert("Enter amount");
 
-    db.ref(`users/${uid}/transactions/${txKey}/status`).set("approved");
+    const userRef = db.ref("users/" + foundUID);
+
+    // update BOTH balance + earned
+    userRef.child("affiliate/availableBalance").transaction(v => (v || 0) + amount);
+    userRef.child("affiliate/totalEarned").transaction(v => (v || 0) + amount);
+
+    alert("Money added successfully ✔");
 }
-
-/* DELETE */
-function deleteDeposit(uid, txKey) {
-    db.ref(`users/${uid}/transactions/${txKey}`).remove();
-}
-
-/* BLOCK SYSTEM */
-document.getElementById("blockBtn").onclick = () => {
-    db.ref("admin/blockDeposit").once("value").then(snap => {
-        const newValue = !(snap.val() === true);
-        db.ref("admin/blockDeposit").set(newValue);
-        alert(newValue ? "Deposits BLOCKED" : "Deposits UNBLOCKED");
-    });
-};
 </script>
 
 </body>
