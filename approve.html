@@ -122,12 +122,14 @@ const firebaseConfig = {
     appId: "1:384386108287:android:d238a5ec8068d9bb9be84a"
 };
 
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
 const db = firebase.database();
 
 let foundUID = null;
+let foundUser = null;
 
-/* ================= SEARCH USER ================= */
+/* ================= SEARCH USER (FIXED) ================= */
 function searchUser() {
 
     const email = document.getElementById("emailInput").value.trim().toLowerCase();
@@ -135,33 +137,41 @@ function searchUser() {
     db.ref("users").once("value").then(snap => {
 
         foundUID = null;
+        foundUser = null;
+
+        let totalRef = 0;
 
         snap.forEach(child => {
             const u = child.val();
 
+            if (!u) return;
+
+            // count referrals safely
+            if (u.referredBy) {
+                totalRef++;
+            }
+
             if (u.email === email) {
+
                 foundUID = child.key;
+                foundUser = u;
+
+                const affiliate = u.affiliate || {
+                    availableBalance: 0,
+                    totalEarned: 0
+                };
 
                 document.getElementById("name").innerText = u.name || "";
                 document.getElementById("email").innerText = u.email || "";
                 document.getElementById("refCode").innerText = u.refCode || "";
 
-                // balances
                 document.getElementById("balance").innerText =
-                    "₦" + ((u.affiliate && u.affiliate.availableBalance) || 0);
+                    "₦" + (affiliate.availableBalance || 0);
 
                 document.getElementById("earned").innerText =
-                    "₦" + ((u.affiliate && u.affiliate.totalEarned) || 0);
+                    "₦" + (affiliate.totalEarned || 0);
 
-                // referrals count
-                let count = 0;
-
-                snap.forEach(x => {
-                    const d = x.val();
-                    if (d.referredBy === u.refCode) count++;
-                });
-
-                document.getElementById("totalRef").innerText = count;
+                document.getElementById("totalRef").innerText = totalRef;
 
                 document.getElementById("result").style.display = "block";
             }
@@ -173,22 +183,91 @@ function searchUser() {
     });
 }
 
-/* ================= ADD MONEY ================= */
+/* ================= ADD MONEY (FIXED) ================= */
 function addMoney() {
 
     const amount = Number(document.getElementById("amount").value);
 
-    if (!foundUID) return alert("Search user first");
-    if (!amount) return alert("Enter amount");
+    if (!foundUID || !foundUser) {
+        alert("Search user first");
+        return;
+    }
 
-    const userRef = db.ref("users/" + foundUID);
+    if (!amount || amount <= 0) {
+        alert("Enter valid amount");
+        return;
+    }
 
-    // update BOTH balance + earned
-    userRef.child("affiliate/availableBalance").transaction(v => (v || 0) + amount);
-    userRef.child("affiliate/totalEarned").transaction(v => (v || 0) + amount);
+    const currentAffiliate = foundUser.affiliate || {
+        availableBalance: 0,
+        totalEarned: 0
+    };
 
-    alert("Money added successfully ✔");
+    const newBalance = (currentAffiliate.availableBalance || 0) + amount;
+    const newEarned = (currentAffiliate.totalEarned || 0) + amount;
+
+    db.ref("users/" + foundUID + "/affiliate").set({
+        availableBalance: newBalance,
+        totalEarned: newEarned
+    }).then(() => {
+        alert("Money added successfully ✔");
+
+        document.getElementById("balance").innerText = "₦" + newBalance;
+        document.getElementById("earned").innerText = "₦" + newEarned;
+    });
 }
+
+/* ================= ADMIN WITHDRAWALS ================= */
+function loadWithdrawals() {
+    const tbody = document.getElementById("withdrawTableBody");
+    tbody.innerHTML = "Loading...";
+
+    db.ref("withdrawals").orderByChild("time").once("value").then(snap => {
+        tbody.innerHTML = "";
+        
+        if (!snap.exists()) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:15px;">No withdrawals yet</td></tr>`;
+            return;
+        }
+
+        snap.forEach(child => {
+            const w = child.val();
+            const key = child.key;
+            const date = new Date(w.time).toLocaleString();
+            const status = w.status || "pending";
+
+            tbody.innerHTML += `
+                <tr id="w-${key}">
+                    <td>${w.email || ''}</td>
+                    <td>₦${w.amount || 0}</td>
+                    <td>${w.bank || ''}</td>
+                    <td>${w.accNum || ''}</td>
+                    <td>${w.accName || ''}</td>
+                    <td>${date}</td>
+                    <td><span style="color:${status==='approved'?'lime':status==='declined'?'red':'#ffaa00'}">${status}</span></td>
+                    <td>
+                        ${status==='pending' ? 
+                        `<button onclick="updateWithdraw('${key}','approved')" style="padding:5px 8px;background:lime;color:#000;border:none;border-radius:5px;cursor:pointer;">Approve</button>
+                         <button onclick="updateWithdraw('${key}','declined')" style="padding:5px 8px;background:red;color:#fff;border:none;border-radius:5px;cursor:pointer;margin-left:5px;">Decline</button>`
+                        : '---'}
+                    </td>
+                </tr>
+            `;
+        });
+    });
+}
+
+function updateWithdraw(key, newStatus) {
+    if (!confirm(`Mark this withdrawal as ${newStatus}?`)) return;
+    
+    db.ref("withdrawals/" + key + "/status").set(newStatus).then(() => {
+        alert(`Withdrawal ${newStatus} ✔`);
+        loadWithdrawals(); // refresh table
+    });
+}
+
+// Auto load withdrawals when admin page opens
+window.addEventListener('load', loadWithdrawals);
 </script>
 
 </body>
