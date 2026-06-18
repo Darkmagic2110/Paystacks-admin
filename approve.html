@@ -1,75 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Withdrawals</title>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 <style>
 body{
-    margin:0;
-    padding:20px;
     background:#111;
-    color:white;
-    font-family:Arial,sans-serif;
+    color:#fff;
+    font-family:Arial;
+    padding:20px;
 }
-h1{
-    text-align:center;
-}
+
 .card{
-    background:#1a1a1a;
+    background:#1c1c1c;
     border:1px solid #333;
-    border-radius:12px;
     padding:15px;
+    margin-bottom:10px;
+    border-radius:10px;
+}
+
+input{
+    width:100%;
+    padding:10px;
     margin-bottom:15px;
 }
-.section{
-    margin-top:10px;
-    padding-top:10px;
-    border-top:1px solid #333;
-}
-.label{
-    color:#00e5ff;
-    font-weight:bold;
-}
 button{
-    background:#00c853;
-    color:white;
-    border:none;
-    padding:10px 15px;
-    border-radius:8px;
-    cursor:pointer;
+    padding:10px;
     margin-top:10px;
-}
-button:hover{
-    opacity:.9;
-}
-.status{
-    font-weight:bold;
-    color:#ffeb3b;
-}
-.search{
-    width:100%;
-    padding:12px;
+    background:green;
     border:none;
-    border-radius:8px;
-    margin-bottom:20px;
+    color:white;
+    cursor:pointer;
 }
 </style>
 </head>
+
 <body>
-<h1>Admin Withdrawal Dashboard</h1>
 
-<input
-type=“text”
-id=“searchEmail”
-class=“search”
-placeholder=“Search by email…”
+<h2>Withdrawals Admin Panel</h2>
 
-<div id="withdrawals"></div>
+<input id="search" placeholder="Search email...">
+
+<div id="list"></div>
+
 <script>
+
 const firebaseConfig = {
     apiKey: "AIzaSyDvFDByPPo9zgwKLdPaREz1OVMQCXmPfrs",
     authDomain: "bets-d795d.firebaseapp.com",
@@ -79,139 +59,72 @@ const firebaseConfig = {
     messagingSenderId: "384386108287",
     appId: "1:384386108287:android:d238a5ec8068d9bb9be84a"
 };
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
 const db = firebase.database();
-let allWithdrawals = [];
-loadWithdrawals();
-document.getElementById("searchEmail")
-.addEventListener("input", renderWithdrawals);
-function loadWithdrawals(){
-    db.ref("withdrawals").on("value", async(snapshot)=>{
-        allWithdrawals = [];
-        const promises = [];
-        snapshot.forEach(child=>{
-            const withdrawal = {
-                id: child.key,
-                ...child.val()
-            };
-            const p = db.ref("users/" + withdrawal.userId)
-            .once("value")
-            .then(userSnap=>{
-                withdrawal.user = userSnap.val() || {};
-                allWithdrawals.push(withdrawal);
-            });
-            promises.push(p);
-        });
-        await Promise.all(promises);
-        allWithdrawals.sort((a,b)=>
-            (b.time || 0) - (a.time || 0)
-        );
-        renderWithdrawals();
-    });
-}
-function renderWithdrawals(){
-    const container = document.getElementById("withdrawals");
-    const keyword = document
-        .getElementById("searchEmail")
-        .value
-        .toLowerCase();
-    container.innerHTML = "";
-    allWithdrawals.forEach(w=>{
-        const email = (w.email || "").toLowerCase();
-        if(keyword && !email.includes(keyword)){
-            return;
-        }
-        const user = w.user || {};
-        const date = w.time
-            ? new Date(w.time).toLocaleString()
-            : "N/A";
-        container.innerHTML += `
+
+let withdrawals = [];
+
+db.ref("withdrawals").on("child_added", async snap => {
+
+    let w = snap.val();
+    w.id = snap.key;
+
+    // get user info
+    let user = {};
+    if (w.userId) {
+        const uSnap = await db.ref("users/" + w.userId).once("value");
+        user = uSnap.val() || {};
+    }
+
+    w.user = user;
+
+    withdrawals.unshift(w);
+
+    render();
+});
+
+function render(){
+
+    const q = document.getElementById("search").value.toLowerCase();
+    const box = document.getElementById("list");
+
+    box.innerHTML = "";
+
+    withdrawals.forEach(w => {
+
+        if(q && !(w.email || "").toLowerCase().includes(q)) return;
+
+        box.innerHTML += `
         <div class="card">
-            <h3>Withdrawal Request</h3>
-            <div>
-                <span class="label">Withdrawal ID:</span>
-                ${w.id}
-            </div>
-            <div>
-                <span class="label">Email:</span>
-                ${w.email || "N/A"}
-            </div>
-            <div>
-                <span class="label">User UID:</span>
-                ${w.userId || "N/A"}
-            </div>
-            <div>
-                <span class="label">Amount:</span>
-                ₦${w.amount || 0}
-            </div>
-            <div>
-                <span class="label">Bank:</span>
-                ${w.bank || "N/A"}
-            </div>
-            <div>
-                <span class="label">Account Number:</span>
-                ${w.accNum || "N/A"}
-            </div>
-            <div>
-                <span class="label">Account Name:</span>
-                ${w.accName || "N/A"}
-            </div>
-            <div>
-                <span class="label">Status:</span>
-                <span class="status">
-                    ${w.status || "pending"}
-                </span>
-            </div>
-            <div>
-                <span class="label">Date:</span>
-                ${date}
-            </div>
-            <div class="section">
-                <h3>User Information</h3>
-                <div>
-                    <span class="label">Name:</span>
-                    ${user.name || "N/A"}
-                </div>
-                <div>
-                    <span class="label">Email:</span>
-                    ${user.email || w.email || "N/A"}
-                </div>
-                <div>
-                    <span class="label">Referral Code:</span>
-                    ${user.refCode || "N/A"}
-                </div>
-                <div>
-                    <span class="label">Referred By:</span>
-                    ${user.referredBy || "N/A"}
-                </div>
-                <div>
-                    <span class="label">Affiliate Balance:</span>
-                    ₦${Number(user.affiliateBalance || 0).toFixed(2)}
-                </div>
-                <div>
-                    <span class="label">Total Earned:</span>
-                    ₦${Number(user.totalEarned || 0).toFixed(2)}
-                </div>
-            </div>
-            <button onclick="markPaid('${w.id}')">
-                Mark As Paid
-            </button>
+            <b>Email:</b> ${w.email}<br>
+            <b>Amount:</b> ₦${w.amount}<br>
+            <b>Bank:</b> ${w.bank}<br>
+            <b>Acc:</b> ${w.accNum}<br>
+            <b>Name:</b> ${w.accName}<br>
+            <b>Status:</b> ${w.status}<br>
+
+            <hr>
+
+            <b>User Name:</b> ${w.user.name || "N/A"}<br>
+            <b>Referral:</b> ${w.user.refCode || "N/A"}<br>
+            <b>Balance:</b> ₦${w.user.affiliateBalance || 0}<br>
+
+            <button onclick="markPaid('${w.id}')">Mark Paid</button>
         </div>
         `;
     });
 }
+
 function markPaid(id){
-    db.ref("withdrawals/" + id + "/status")
-    .set("paid")
-    .then(()=>{
-        alert("Withdrawal marked as paid");
-    })
-    .catch(err=>{
-        alert(err.message);
-    });
+    db.ref("withdrawals/" + id + "/status").set("paid");
+    alert("Updated!");
 }
+
+document.getElementById("search").oninput = render;
+
 </script>
+
 </body>
 </html>
