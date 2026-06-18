@@ -1,55 +1,69 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Admin Withdrawals</title>
+    <title>Admin Withdrawal Control</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body {
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
 
-<style>
-body{
-    background:#111;
-    color:#fff;
-    font-family:Arial;
-    padding:20px;
-}
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            margin: auto;
+        }
 
-.card{
-    background:#1c1c1c;
-    border:1px solid #333;
-    padding:15px;
-    margin-bottom:10px;
-    border-radius:10px;
-}
+        button {
+            padding: 12px;
+            margin: 10px;
+            width: 100%;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
 
-input{
-    width:100%;
-    padding:10px;
-    margin-bottom:15px;
-}
-button{
-    padding:10px;
-    margin-top:10px;
-    background:green;
-    border:none;
-    color:white;
-    cursor:pointer;
-}
-</style>
+        .open {
+            background: #22c55e;
+            color: white;
+        }
+
+        .close {
+            background: #ef4444;
+            color: white;
+        }
+
+        .status {
+            margin: 15px 0;
+            font-size: 18px;
+        }
+    </style>
 </head>
 
 <body>
 
-<h2>Withdrawals Admin Panel</h2>
+<h2>Withdrawal Admin Panel</h2>
 
-<input id="search" placeholder="Search email...">
+<div class="card">
+    <div class="status">
+        Status: <span id="statusText">Loading...</span>
+    </div>
 
-<div id="list"></div>
+    <button class="open" onclick="openWithdraw()">OPEN WITHDRAWAL</button>
+    <button class="close" onclick="closeWithdraw()">BLOCK WITHDRAWAL</button>
+</div>
 
 <script>
-
 const firebaseConfig = {
     apiKey: "AIzaSyDvFDByPPo9zgwKLdPaREz1OVMQCXmPfrs",
     authDomain: "bets-d795d.firebaseapp.com",
@@ -61,69 +75,32 @@ const firebaseConfig = {
 };
 
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-
 const db = firebase.database();
 
-let withdrawals = [];
+/* LIVE STATUS */
+db.ref("settings/withdrawal/enabled").on("value", snap => {
+    const val = snap.val();
 
-db.ref("withdrawals").on("child_added", async snap => {
-
-    let w = snap.val();
-    w.id = snap.key;
-
-    // get user info
-    let user = {};
-    if (w.userId) {
-        const uSnap = await db.ref("users/" + w.userId).once("value");
-        user = uSnap.val() || {};
+    if (val === false) {
+        document.getElementById("statusText").innerText = "BLOCKED ❌";
+        document.getElementById("statusText").style.color = "red";
+    } else {
+        document.getElementById("statusText").innerText = "OPEN ✅";
+        document.getElementById("statusText").style.color = "lime";
     }
-
-    w.user = user;
-
-    withdrawals.unshift(w);
-
-    render();
 });
 
-function render(){
-
-    const q = document.getElementById("search").value.toLowerCase();
-    const box = document.getElementById("list");
-
-    box.innerHTML = "";
-
-    withdrawals.forEach(w => {
-
-        if(q && !(w.email || "").toLowerCase().includes(q)) return;
-
-        box.innerHTML += `
-        <div class="card">
-            <b>Email:</b> ${w.email}<br>
-            <b>Amount:</b> ₦${w.amount}<br>
-            <b>Bank:</b> ${w.bank}<br>
-            <b>Acc:</b> ${w.accNum}<br>
-            <b>Name:</b> ${w.accName}<br>
-            <b>Status:</b> ${w.status}<br>
-
-            <hr>
-
-            <b>User Name:</b> ${w.user.name || "N/A"}<br>
-            <b>Referral:</b> ${w.user.refCode || "N/A"}<br>
-            <b>Balance:</b> ₦${w.user.affiliateBalance || 0}<br>
-
-            <button onclick="markPaid('${w.id}')">Mark Paid</button>
-        </div>
-        `;
-    });
+/* OPEN WITHDRAWAL */
+function openWithdraw() {
+    db.ref("settings/withdrawal/enabled").set(true);
+    alert("Withdrawal OPENED");
 }
 
-function markPaid(id){
-    db.ref("withdrawals/" + id + "/status").set("paid");
-    alert("Updated!");
+/* BLOCK WITHDRAWAL */
+function closeWithdraw() {
+    db.ref("settings/withdrawal/enabled").set(false);
+    alert("Withdrawal BLOCKED");
 }
-
-document.getElementById("search").oninput = render;
-
 </script>
 
 </body>
