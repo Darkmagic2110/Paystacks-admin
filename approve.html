@@ -20,8 +20,8 @@ header button { background:#dc2626; border:none; padding:8px 14px; color:white; 
 .tab { padding:10px 16px; cursor:pointer; color:#9ca3af; border-bottom:2px solid transparent; }
 .tab.active { color:#60a5fa; border-bottom:2px solid #60a5fa; }
 
-.search { margin-bottom:15px; }
-.search input { width:100%; padding:12px; background:#13161d; border:1px solid #222734; border-radius:8px; color:#e5e7eb; }
+.search { margin-bottom:15px; display:flex; gap:10px; }
+.search input { flex:1; padding:12px; background:#13161d; border:1px solid #222734; border-radius:8px; color:#e5e7eb; }
 
 .actions { display:flex; gap:10px; margin-bottom:15px; }
 table { width:100%; border-collapse:collapse; background:#13161d; border-radius:10px; overflow:hidden; }
@@ -31,6 +31,8 @@ tr:hover { background:#1a1e27; }
 .btn { padding:6px 12px; background:#2563eb; border:none; color:white; border-radius:5px; cursor:pointer; font-size:12px; }
 .btn.red { background:#dc2626; }
 .btn.red:hover { background:#b91c1c; }
+.btn.green { background:#10b981; }
+.btn.green:hover { background:#059669; }
 .status { padding:4px 8px; border-radius:4px; font-size:12px; }
 .status.pending, .status.instant { background:#f59e0b33; color:#f59e0b; }
 .status.paid { background:#10b98133; color:#10b981; }
@@ -38,6 +40,7 @@ tr:hover { background:#1a1e27; }
 .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:999; }
 .modal-content { background:#13161d; padding:25px; border-radius:12px; width:90%; max-width:520px; border:1px solid #222734; }
 .modal-content h2 { margin-bottom:15px; color:#60a5fa; }
+.modal-content input { width:100%; padding:12px; margin-bottom:12px; background:#0f1218; border:1px solid #222734; border-radius:8px; color:#e5e7eb; }
 .close { float:right; cursor:pointer; font-size:26px; color:#9ca3af; }
 .detail { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:15px; }
 .detail-item { background:#0f1218; padding:12px; border-radius:8px; }
@@ -68,6 +71,7 @@ input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
 
 <div class="search">
   <input type="text" id="search" placeholder="Search by name, email, UID, refCode..." onkeyup="filterData()">
+  <button class="btn green" onclick="openAddMoney()">+ Add Money</button>
 </div>
 
 <!-- USERS TAB -->
@@ -117,6 +121,17 @@ input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
     <span class="close" onclick="closeModal()">&times;</span>
     <h2>Affiliate Details</h2>
     <div class="detail" id="userDetail"></div>
+  </div>
+</div>
+
+<!-- Add Money Modal -->
+<div class="modal" id="addMoneyModal">
+  <div class="modal-content">
+    <span class="close" onclick="closeAddMoney()">&times;</span>
+    <h2>Add Money to User</h2>
+    <input type="email" id="addMoneyEmail" placeholder="User Email">
+    <input type="number" id="addMoneyAmount" placeholder="Amount ₦" min="1">
+    <button class="btn green" onclick="addMoneyToUser()">Add Money</button>
   </div>
 </div>
 
@@ -342,6 +357,47 @@ function markPaid(id) {
   if(confirm("Mark as paid?")) {
     db.ref("withdrawals/" + id).update({status: "paid", paidAt: Date.now()});
   }
+}
+
+/* ADD MONEY FEATURE */
+function openAddMoney() {
+  document.getElementById("addMoneyModal").style.display = "flex";
+}
+
+function closeAddMoney() {
+  document.getElementById("addMoneyModal").style.display = "none";
+  document.getElementById("addMoneyEmail").value = "";
+  document.getElementById("addMoneyAmount").value = "";
+}
+
+function addMoneyToUser() {
+  const email = document.getElementById("addMoneyEmail").value.trim().toLowerCase();
+  const amount = Number(document.getElementById("addMoneyAmount").value);
+  
+  if(!email || !amount || amount <= 0) {
+    alert("Enter valid email and amount");
+    return;
+  }
+  
+  // Find user by email
+  db.ref("users").orderByChild("email").equalTo(email).once("value").then(snap => {
+    if(!snap.exists()) {
+      alert("User not found with email: " + email);
+      return;
+    }
+    
+    snap.forEach(child => {
+      const uid = child.key;
+      const ref = db.ref("users/" + uid);
+      
+      // Add to both affiliateBalance and totalEarned using transaction
+      ref.child("affiliateBalance").transaction(v => (v || 0) + amount);
+      ref.child("totalEarned").transaction(v => (v || 0) + amount);
+      
+      alert("₦" + amount.toLocaleString() + " added to " + email);
+      closeAddMoney();
+    });
+  });
 }
 </script>
 </body>
