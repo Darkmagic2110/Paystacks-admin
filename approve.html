@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Panel</title>
+<title>Affiliate Admin Panel</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', sans-serif; }
 body { background:#0a0b0f; color:#e5e7eb; padding:20px; }
@@ -50,19 +50,19 @@ input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
 <body>
 
 <header>
-  <h1>🔐 Admin Panel</h1>
+  <h1>🔐 Affiliate Admin Panel</h1>
   <button onclick="firebase.auth().signOut()">Logout</button>
 </header>
 
 <div class="stats">
-  <div class="stat-card"><h4>Total Users</h4><div class="num" id="totalUsers">0</div></div>
+  <div class="stat-card"><h4>Affiliates</h4><div class="num" id="totalUsers">0</div></div>
   <div class="stat-card"><h4>Total Affiliate Balance</h4><div class="num" id="totalBal">₦0</div></div>
   <div class="stat-card"><h4>Total Earned</h4><div class="num" id="totalEarned">₦0</div></div>
   <div class="stat-card"><h4>Pending Withdrawals</h4><div class="num" id="pendingWd">0</div></div>
 </div>
 
 <div class="tabs">
-  <div class="tab active" onclick="showTab('users')">Users</div>
+  <div class="tab active" onclick="showTab('users')">Affiliates</div>
   <div class="tab" onclick="showTab('withdrawals')">Withdrawals</div>
 </div>
 
@@ -115,7 +115,7 @@ input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
 <div class="modal" id="modal">
   <div class="modal-content">
     <span class="close" onclick="closeModal()">&times;</span>
-    <h2>User Details</h2>
+    <h2>Affiliate Details</h2>
     <div class="detail" id="userDetail"></div>
   </div>
 </div>
@@ -138,6 +138,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let users = [];
+let affiliateUsers = [];
 let allWithdrawals = [];
 let currentTab = 'users';
 
@@ -151,18 +152,27 @@ firebase.auth().onAuthStateChanged(user => {
 function loadAllUsers() {
   db.ref("users").on("value", snap => {
     users = [];
+    affiliateUsers = [];
     let totalBal = 0, totalEarned = 0;
+    
     snap.forEach(child => {
       const u = child.val() || {};
       u.uid = child.key;
       users.push(u);
-      totalBal += u.affiliateBalance || 0;
-      totalEarned += u.totalEarned || 0;
+      
+      // ONLY users with refCode = affiliates
+      if(u.refCode && u.refCode.trim() !== "") {
+        affiliateUsers.push(u);
+        totalBal += u.affiliateBalance || 0;
+        totalEarned += u.totalEarned || 0;
+      }
     });
-    document.getElementById("totalUsers").innerText = users.length;
+    
+    document.getElementById("totalUsers").innerText = affiliateUsers.length;
     document.getElementById("totalBal").innerText = "₦" + totalBal.toLocaleString();
     document.getElementById("totalEarned").innerText = "₦" + totalEarned.toLocaleString();
-    if(currentTab === 'users') renderUsers(users);
+    
+    if(currentTab === 'users') renderUsers(affiliateUsers);
   });
 }
 
@@ -183,6 +193,10 @@ function loadWithdrawals() {
 
 function renderUsers(list) {
   const tbody = document.querySelector("#userTable tbody");
+  if(list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#9ca3af; padding:30px;">No affiliates found</td></tr>`;
+    return;
+  }
   tbody.innerHTML = list.map(u => `
     <tr>
       <td>${u.name || 'N/A'}</td>
@@ -190,7 +204,7 @@ function renderUsers(list) {
       <td>₦${(u.affiliateBalance || 0).toFixed(2)}</td>
       <td>₦${(u.totalEarned || 0).toFixed(2)}</td>
       <td>${u.totalReferrals || 0}</td>
-      <td>${u.refCode || '-'}</td>
+      <td>${u.refCode}</td>
       <td><button class="btn" onclick='viewUser("${u.uid}")'>View All</button></td>
     </tr>
   `).join('');
@@ -229,7 +243,7 @@ function viewUser(uid) {
     <div class="detail-item"><label>Affiliate Balance</label><b>₦${(u.affiliateBalance || 0).toFixed(2)}</b></div>
     <div class="detail-item"><label>Total Earned</label><b>₦${(u.totalEarned || 0).toFixed(2)}</b></div>
     <div class="detail-item"><label>Total Referrals</label><b>${u.totalReferrals || 0}</b></div>
-    <div class="detail-item"><label>Ref Code</label><b>${u.refCode || 'None'}</b></div>
+    <div class="detail-item"><label>Ref Code</label><b>${u.refCode}</b></div>
     <div class="detail-item"><label>Referred By</label><b>${u.referredBy || 'None'}</b></div>
     <div class="detail-item" style="grid-column:1/3;"><label>Referral Link</label><b class="link">${refLink}</b></div>
     <div class="detail-item" style="grid-column:1/3;"><label>Referred By Link</label><b class="link">${referredByLink}</b></div>
@@ -250,14 +264,14 @@ function showTab(tab) {
   document.getElementById('withdrawalsTab').style.display = tab === 'withdrawals' ? 'block' : 'none';
   
   document.getElementById('search').value = '';
-  if(tab === 'users') renderUsers(users);
+  if(tab === 'users') renderUsers(affiliateUsers);
   else renderWithdrawals();
 }
 
 function filterData() {
   const q = document.getElementById("search").value.toLowerCase();
   if(currentTab === 'users') {
-    const filtered = users.filter(u => 
+    const filtered = affiliateUsers.filter(u => 
       (u.name||'').toLowerCase().includes(q) ||
       (u.email||'').toLowerCase().includes(q) ||
       (u.uid||'').includes(q) ||
