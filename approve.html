@@ -16,15 +16,24 @@ header button { background:#dc2626; border:none; padding:8px 14px; color:white; 
 .stat-card h4 { font-size:12px; color:#9ca3af; margin-bottom:6px; }
 .stat-card .num { font-size:24px; font-weight:700; color:#60a5fa; }
 
+.tabs { display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #222734; }
+.tab { padding:10px 16px; cursor:pointer; color:#9ca3af; border-bottom:2px solid transparent; }
+.tab.active { color:#60a5fa; border-bottom:2px solid #60a5fa; }
+
 .search { margin-bottom:15px; }
 .search input { width:100%; padding:12px; background:#13161d; border:1px solid #222734; border-radius:8px; color:#e5e7eb; }
 
+.actions { display:flex; gap:10px; margin-bottom:15px; }
 table { width:100%; border-collapse:collapse; background:#13161d; border-radius:10px; overflow:hidden; }
 th { background:#0f1218; padding:12px; text-align:left; font-size:11px; color:#9ca3af; text-transform:uppercase; }
 td { padding:12px; border-bottom:1px solid #222734; font-size:13px; }
 tr:hover { background:#1a1e27; }
-.btn { padding:5px 10px; background:#2563eb; border:none; color:white; border-radius:5px; cursor:pointer; font-size:12px; }
+.btn { padding:6px 12px; background:#2563eb; border:none; color:white; border-radius:5px; cursor:pointer; font-size:12px; }
 .btn.red { background:#dc2626; }
+.btn.red:hover { background:#b91c1c; }
+.status { padding:4px 8px; border-radius:4px; font-size:12px; }
+.status.pending, .status.instant { background:#f59e0b33; color:#f59e0b; }
+.status.paid { background:#10b98133; color:#10b981; }
 
 .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:999; }
 .modal-content { background:#13161d; padding:25px; border-radius:12px; width:90%; max-width:520px; border:1px solid #222734; }
@@ -35,6 +44,7 @@ tr:hover { background:#1a1e27; }
 .detail-item label { font-size:11px; color:#9ca3af; display:block; margin-bottom:4px; }
 .detail-item b { font-size:15px; color:#e5e7eb; }
 .link { color:#60a5fa; font-size:12px; word-break:break-all; }
+input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -51,10 +61,17 @@ tr:hover { background:#1a1e27; }
   <div class="stat-card"><h4>Pending Withdrawals</h4><div class="num" id="pendingWd">0</div></div>
 </div>
 
-<div class="search">
-  <input type="text" id="search" placeholder="Search by name, email, UID, refCode..." onkeyup="filterUsers()">
+<div class="tabs">
+  <div class="tab active" onclick="showTab('users')">Users</div>
+  <div class="tab" onclick="showTab('withdrawals')">Withdrawals</div>
 </div>
 
+<div class="search">
+  <input type="text" id="search" placeholder="Search by name, email, UID, refCode..." onkeyup="filterData()">
+</div>
+
+<!-- USERS TAB -->
+<div id="usersTab">
 <table id="userTable">
   <thead>
     <tr>
@@ -69,6 +86,30 @@ tr:hover { background:#1a1e27; }
   </thead>
   <tbody></tbody>
 </table>
+</div>
+
+<!-- WITHDRAWALS TAB -->
+<div id="withdrawalsTab" style="display:none;">
+  <div class="actions">
+    <button class="btn red" onclick="deleteSelected()">Delete Selected</button>
+    <button class="btn red" onclick="deleteAllWithdrawals()">Delete All Withdrawals</button>
+  </div>
+  <table id="wdTable">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="checkAll" onclick="toggleAll(this)"></th>
+        <th>User</th>
+        <th>Amount</th>
+        <th>Bank</th>
+        <th>Account</th>
+        <th>Status</th>
+        <th>Time</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
 
 <!-- User Detail Modal -->
 <div class="modal" id="modal">
@@ -78,10 +119,6 @@ tr:hover { background:#1a1e27; }
     <div class="detail" id="userDetail"></div>
   </div>
 </div>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -101,12 +138,12 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let users = [];
+let allWithdrawals = [];
+let currentTab = 'users';
 
-// REMOVED ADMIN CHECK - just check if logged in
+// No admin check - just login required
 firebase.auth().onAuthStateChanged(user => {
   if (!user) return location.href = "login.html";
-  
-  // Directly load data, no admin verification
   loadAllUsers();
   loadWithdrawals();
 });
@@ -125,11 +162,26 @@ function loadAllUsers() {
     document.getElementById("totalUsers").innerText = users.length;
     document.getElementById("totalBal").innerText = "₦" + totalBal.toLocaleString();
     document.getElementById("totalEarned").innerText = "₦" + totalEarned.toLocaleString();
-    renderTable(users);
+    if(currentTab === 'users') renderUsers(users);
   });
 }
 
-function renderTable(list) {
+function loadWithdrawals() {
+  db.ref("withdrawals").on("value", snap => {
+    allWithdrawals = [];
+    let pending = 0;
+    snap.forEach(child => {
+      const w = child.val();
+      w.id = child.key;
+      allWithdrawals.push(w);
+      if(w.status === 'pending' || w.status === 'instant') pending++;
+    });
+    document.getElementById("pendingWd").innerText = pending;
+    if(currentTab === 'withdrawals') renderWithdrawals();
+  });
+}
+
+function renderUsers(list) {
   const tbody = document.querySelector("#userTable tbody");
   tbody.innerHTML = list.map(u => `
     <tr>
@@ -140,6 +192,25 @@ function renderTable(list) {
       <td>${u.totalReferrals || 0}</td>
       <td>${u.refCode || '-'}</td>
       <td><button class="btn" onclick='viewUser("${u.uid}")'>View All</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderWithdrawals() {
+  const tbody = document.querySelector("#wdTable tbody");
+  tbody.innerHTML = allWithdrawals.sort((a,b) => b.time - a.time).map(w => `
+    <tr>
+      <td><input type="checkbox" class="wdCheck" data-id="${w.id}"></td>
+      <td>${w.email || w.userId}</td>
+      <td>₦${w.amount?.toLocaleString()}</td>
+      <td>${w.bank}</td>
+      <td>${w.accNum}</td>
+      <td><span class="status ${w.status}">${w.status}</span></td>
+      <td>${new Date(w.time).toLocaleString()}</td>
+      <td>
+        <button class="btn" onclick='markPaid("${w.id}")'>Mark Paid</button>
+        <button class="btn red" onclick='deleteWd("${w.id}")'>Delete</button>
+      </td>
     </tr>
   `).join('');
 }
@@ -170,25 +241,93 @@ function closeModal() {
   document.getElementById("modal").style.display = "none";
 }
 
-function filterUsers() {
-  const q = document.getElementById("search").value.toLowerCase();
-  const filtered = users.filter(u => 
-    (u.name||'').toLowerCase().includes(q) ||
-    (u.email||'').toLowerCase().includes(q) ||
-    (u.uid||'').includes(q) ||
-    (u.refCode||'').toLowerCase().includes(q)
-  );
-  renderTable(filtered);
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  document.getElementById('usersTab').style.display = tab === 'users' ? 'block' : 'none';
+  document.getElementById('withdrawalsTab').style.display = tab === 'withdrawals' ? 'block' : 'none';
+  
+  document.getElementById('search').value = '';
+  if(tab === 'users') renderUsers(users);
+  else renderWithdrawals();
 }
 
-function loadWithdrawals() {
-  db.ref("withdrawals").on("value", snap => {
-    let pending = 0;
-    snap.forEach(child => {
-      if(child.val().status === 'pending' || child.val().status === 'instant') pending++;
-    });
-    document.getElementById("pendingWd").innerText = pending;
+function filterData() {
+  const q = document.getElementById("search").value.toLowerCase();
+  if(currentTab === 'users') {
+    const filtered = users.filter(u => 
+      (u.name||'').toLowerCase().includes(q) ||
+      (u.email||'').toLowerCase().includes(q) ||
+      (u.uid||'').includes(q) ||
+      (u.refCode||'').toLowerCase().includes(q)
+    );
+    renderUsers(filtered);
+  } else {
+    const filtered = allWithdrawals.filter(w => 
+      (w.email||'').toLowerCase().includes(q) ||
+      (w.userId||'').includes(q) ||
+      (w.bank||'').toLowerCase().includes(q)
+    );
+    const tbody = document.querySelector("#wdTable tbody");
+    tbody.innerHTML = filtered.sort((a,b) => b.time - a.time).map(w => `
+      <tr>
+        <td><input type="checkbox" class="wdCheck" data-id="${w.id}"></td>
+        <td>${w.email || w.userId}</td>
+        <td>₦${w.amount?.toLocaleString()}</td>
+        <td>${w.bank}</td>
+        <td>${w.accNum}</td>
+        <td><span class="status ${w.status}">${w.status}</span></td>
+        <td>${new Date(w.time).toLocaleString()}</td>
+        <td>
+          <button class="btn" onclick='markPaid("${w.id}")'>Mark Paid</button>
+          <button class="btn red" onclick='deleteWd("${w.id}")'>Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+}
+
+function toggleAll(checkbox) {
+  document.querySelectorAll('.wdCheck').forEach(cb => cb.checked = checkbox.checked);
+}
+
+function deleteWd(id) {
+  if(confirm("Delete this withdrawal?")) {
+    db.ref("withdrawals/" + id).remove();
+  }
+}
+
+function deleteSelected() {
+  const checked = document.querySelectorAll('.wdCheck:checked');
+  if(checked.length === 0) return alert("Select at least 1 withdrawal");
+  
+  if(!confirm(`Delete ${checked.length} withdrawal(s)? Cannot be undone.`)) return;
+  
+  checked.forEach(cb => {
+    const id = cb.dataset.id;
+    db.ref("withdrawals/" + id).remove();
   });
+  alert("Deleted!");
+  document.getElementById('checkAll').checked = false;
+}
+
+function deleteAllWithdrawals() {
+  if(allWithdrawals.length === 0) return alert("No withdrawals to delete");
+  
+  if(!confirm(`WARNING: Delete ALL ${allWithdrawals.length} withdrawals?`)) return;
+  if(prompt("Type DELETE to confirm") !== "DELETE") return alert("Cancelled");
+  
+  db.ref("withdrawals").remove()
+    .then(() => alert("All withdrawals deleted"))
+    .catch(err => alert("Error: " + err.message));
+}
+
+function markPaid(id) {
+  if(confirm("Mark as paid?")) {
+    db.ref("withdrawals/" + id).update({status: "paid", paidAt: Date.now()});
+  }
 }
 </script>
 </body>
