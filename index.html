@@ -3,80 +3,148 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Admin - Set Keys, Add Coins & View History</title>
+<title>Admin - Dark Magic Ai Bot</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
 
 <style>
 body {
-    background: black;
+    background: linear-gradient(to bottom, #000, #1a0000);
     color: white;
     font-family: 'Poppins', sans-serif;
     text-align: center;
     padding: 20px;
 }
 h1 {
-    font-size: 28px;
-    color: red;
-    margin-bottom: 20px;
+    font-family: 'UnifrakturCook', cursive;
+    font-size: 32px;
+    color: #ff1a1a;
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(255,0,0,0.6);
 }
-input[type="text"], input[type="password"], input[type="number"] {
-    width: 90%;
-    padding: 12px;
-    font-size: 16px;
-    margin: 10px 0;
-    border-radius: 8px;
-    border: none;
+h2 {
+    color: #00e5ff;
+    font-size: 20px;
+    margin: 20px 0 10px;
+    text-shadow: 0 0 8px rgba(0,229,255,0.4);
 }
-button {
-    width: 92%;
-    padding: 14px;
-    background: #e60000;
-    font-size: 16px;
-    color: #ffffff;
-    font-weight: 600;
-    border-radius: 10px;
-    border: none;
-    margin-top: 12px;
-    cursor: pointer;
-    letter-spacing: 0.5px;
-    transition: 0.3s ease-in-out;
-    box-shadow: 0 0 18px rgba(255, 0, 0, 0.7);
-}
-button:hover {
-    box-shadow: 0 0 25px rgba(255, 0, 0, 1);
-}
-#approvePageBtn {
-    background: #00b300;
-}
-#status {
-    margin-top: 15px;
-    font-size: 16px;
-    color: yellow;
-}
-#historyBox {
-    margin-top: 25px;
+.glass-card {
+    width: 95%;
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    background: rgba(20,20,20,0.4);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255,0,0,0.3);
+    border-radius: 18px;
+    box-shadow: 0 0 25px rgba(255,0,0,0.2);
     text-align: left;
 }
+input[type="text"], input[type="password"], input[type="number"] {
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    margin: 8px 0;
+    border-radius: 10px;
+    border: 2px solid #333;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    box-sizing: border-box;
+    transition: 0.3s;
+}
+input:focus {
+    border-color: #ff1a1a;
+    outline: none;
+    box-shadow: 0 0 10px rgba(255,0,0,0.4);
+}
+.glass-btn {
+    width: 100%;
+    padding: 14px;
+    background: rgba(255, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 0, 0, 0.5);
+    font-size: 16px;
+    color: #ffffff;
+    font-weight: 700;
+    border-radius: 12px;
+    margin-top: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+    box-shadow: 0 0 18px rgba(255, 0, 0, 0.5);
+}
+.glass-btn:hover {
+    background: rgba(255, 0, 0, 0.25);
+    transform: scale(1.02);
+}
+.glass-btn.green { border-color: rgba(0,255,0,0.5); box-shadow: 0 0 18px rgba(0,255,0,0.4); }
+.glass-btn.cyan { border-color: rgba(0,229,255,0.5); box-shadow: 0 0 18px rgba(0,229,255,0.4); }
+.glass-btn.red { border-color: rgba(255,0,0,0.7); }
+
+#status {
+    margin-top: 15px;
+    font-size: 15px;
+    color: #ffdd00;
+    text-align: center;
+}
+
+/* CODE LIST */
+.code-item {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 14px;
+    margin: 12px 0;
+}
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.code-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #00e5ff;
+    letter-spacing: 1px;
+}
+.code-stats {
+    font-size: 13px;
+    color: #aaa;
+}
+.user-list {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #ccc;
+    max-height: 120px;
+    overflow-y: auto;
+}
+.user-list div {
+    padding: 4px 0;
+    border-bottom: 1px dashed #222;
+}
+
+/* HISTORY */
+#historyBox {
+    margin-top: 25px;
+}
 .history-item {
-    background: #111;
+    background: rgba(0,0,0,0.5);
     border-radius: 10px;
     padding: 12px;
     margin: 10px 0;
     display: flex;
     justify-content: space-between;
-    font-family: 'Poppins', sans-serif;
 }
-.history-left { text-align: left; }
-.history-right { text-align: right; }
 .history-title { color: lime; }
 .history-sub { font-size: 12px; color: #aaa; }
 .history-naira { color: cyan; font-size: 13px; }
+
 #toast {
     visibility: hidden;
     min-width: 240px;
     background-color: red;
-    color: black;
+    color: white;
     text-align: center;
     border-radius: 10px;
     padding: 12px;
@@ -94,35 +162,64 @@ button:hover {
     opacity: 1;
     bottom: 50px;
 }
+.divider { height:2px; background: linear-gradient(90deg, transparent, #ff1a1a, transparent); margin:20px 0; }
 </style>
 </head>
 <body>
 
-<h1>Admin Dashboard</h1>
-<button id="approvePageBtn">✅ Approve Page</button>
+<h1>Dark Magic Admin</h1>
 
-<h1>Admin: Set Flutterwave Keys</h1>
-<input type="text" id="publicKey" placeholder="Enter Flutterwave Public Key" />
-<input type="password" id="secretKey" placeholder="Enter Flutterwave Secret Key" />
-<button id="saveBtn">💾 Save Keys</button>
+<!-- APPROVE -->
+<button class="glass-btn green" id="approvePageBtn">✅ Approve Page</button>
 
-<hr style="margin:20px 0; border-color: #444;" />
+<div class="divider"></div>
 
-<h1>Add Coins to User</h1>
-<input type="text" id="userEmail" placeholder="Enter User Email" />
-<input type="number" id="coinAmount" placeholder="Enter Amount" min="1" />
-<button id="addCoinsBtn">💰 Add Coins</button>
+<!-- KEYS -->
+<div class="glass-card">
+    <h2>🔑 Flutterwave Keys</h2>
+    <input type="text" id="publicKey" placeholder="Enter Flutterwave Public Key" />
+    <input type="password" id="secretKey" placeholder="Enter Flutterwave Secret Key" />
+    <button class="glass-btn" id="saveBtn">💾 Save Keys</button>
+    <div id="status"></div>
+</div>
 
-<hr style="margin:20px 0; border-color: #444;" />
+<div class="divider"></div>
 
-<h1>View User Transaction History</h1>
-<input type="text" id="historyEmail" placeholder="Enter User Email" />
-<button id="loadHistoryBtn">📜 Load History</button>
+<!-- ADD COINS -->
+<div class="glass-card">
+    <h2>💰 Add Coins to User</h2>
+    <input type="text" id="userEmail" placeholder="Enter User Email" />
+    <input type="number" id="coinAmount" placeholder="Enter Amount" min="1" />
+    <button class="glass-btn" id="addCoinsBtn">💰 Add Coins</button>
+</div>
 
-<div id="status"></div>
-<div id="historyBox">
-    <h3>Transactions</h3>
-    <div id="historyList"></div>
+<div class="divider"></div>
+
+<!-- REDEEM CODE MANAGER -->
+<div class="glass-card">
+    <h2>🎁 Create Redeem Code</h2>
+    <input type="text" id="newCode" placeholder="CODE NAME e.g DARK50FREE" style="text-transform:uppercase; letter-spacing:2px;" />
+    <input type="number" id="codeCoins" placeholder="Coins per user" min="1" />
+    <input type="number" id="codeMaxUses" placeholder="Max Uses" min="1" />
+    <button class="glass-btn cyan" id="createCodeBtn">➕ Create Code</button>
+</div>
+
+<div class="glass-card">
+    <h2>📜 Active Redeem Codes</h2>
+    <div id="codesList">Loading codes...</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- HISTORY -->
+<div class="glass-card">
+    <h2>📜 View User Transaction History</h2>
+    <input type="text" id="historyEmail" placeholder="Enter User Email" />
+    <button class="glass-btn" id="loadHistoryBtn">📜 Load History</button>
+    <div id="historyBox">
+        <h3 style="text-align:center; color:#ff1a1a;">Transactions</h3>
+        <div id="historyList"></div>
+    </div>
 </div>
 
 <div id="toast"></div>
@@ -152,17 +249,14 @@ function toast(msg) {
 }
 
 firebase.auth().onAuthStateChanged(user => {
-    if (!user) {
-        window.location.href = "login.html";
-        return;
-    }
+    if (!user) { window.location.href = "login.html"; return; }
 });
 
 document.getElementById("approvePageBtn").onclick = () => {
     window.location.href = "approve.html";
 };
 
-/* ✅ UPDATED TO FLUTTERWAVE */
+/* SAVE KEYS */
 document.getElementById("saveBtn").onclick = () => {
     const publicKey = document.getElementById("publicKey").value.trim();
     const secretKey = document.getElementById("secretKey").value.trim();
@@ -179,6 +273,7 @@ document.getElementById("saveBtn").onclick = () => {
     });
 };
 
+/* ADD COINS */
 document.getElementById("addCoinsBtn").onclick = () => {
     const email = document.getElementById("userEmail").value.trim();
     const amount = parseInt(document.getElementById("coinAmount").value);
@@ -187,57 +282,116 @@ document.getElementById("addCoinsBtn").onclick = () => {
     db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
         if (!snapshot.exists()) return toast("User not found!");
         snapshot.forEach(userSnap => {
-            const userRef = db.ref("users/" + userSnap.key + "/balance");
-            userRef.transaction(current => (current || 0) + amount);
-            toast(`✅ Added ${amount} coins to ${email}`);
-
-            const txRef = db.ref("users/" + userSnap.key + "/transactions");
-            txRef.push({
+            const uid = userSnap.key;
+            db.ref("users/" + uid + "/balance").transaction(current => (current || 0) + amount);
+            db.ref("users/" + uid + "/transactions").push({
                 type: "deposit",
                 coins: amount,
                 amount: amount,
                 ref: "DEP-" + Date.now(),
                 time: Date.now(),
                 email: email,
-                uid: userSnap.key
+                uid: uid
             });
+            toast(`✅ Added ${amount} coins to ${email}`);
         });
-    }).catch(err => { toast("❌ Error adding coins: " + err.message); });
+    }).catch(err => { toast("❌ Error: " + err.message); });
 };
 
+/* CREATE REDEEM CODE */
+document.getElementById("createCodeBtn").onclick = () => {
+    const code = document.getElementById("newCode").value.trim().toUpperCase();
+    const coins = parseInt(document.getElementById("codeCoins").value);
+    const maxUses = parseInt(document.getElementById("codeMaxUses").value);
+
+    if(!code || !coins || !maxUses) return toast("Fill all fields");
+    
+    db.ref("redeem_codes/" + code).set({
+        coins: coins,
+        maxUses: maxUses,
+        usedCount: 0,
+        createdAt: Date.now()
+    }).then(()=>{
+        toast(`✅ Code ${code} created!`);
+        document.getElementById("newCode").value = "";
+        document.getElementById("codeCoins").value = "";
+        document.getElementById("codeMaxUses").value = "";
+        loadCodes();
+    });
+};
+
+/* LOAD ALL CODES + WHO USED */
+function loadCodes() {
+    db.ref("redeem_codes").on("value", snap=>{
+        const codesList = document.getElementById("codesList");
+        codesList.innerHTML = "";
+        if(!snap.exists()) { codesList.innerHTML = "No codes yet"; return; }
+
+        snap.forEach(codeSnap=>{
+            const code = codeSnap.key;
+            const data = codeSnap.val();
+            const codeDiv = document.createElement("div");
+            codeDiv.className = "code-item";
+            codeDiv.innerHTML = `
+                <div class="code-header">
+                    <div class="code-name">${code}</div>
+                    <button class="glass-btn red" style="width:auto; padding:6px 12px; font-size:12px;" onclick="deleteCode('${code}')">Delete</button>
+                </div>
+                <div class="code-stats">${data.usedCount}/${data.maxUses} Used | ${data.coins} Coins each</div>
+                <div class="user-list" id="users-${code}">Loading users...</div>
+            `;
+            codesList.appendChild(codeDiv);
+
+            // Load who used this code
+            db.ref("redeem_code_uses/" + code).once("value").then(userSnap=>{
+                const userListDiv = document.getElementById(`users-${code}`);
+                if(!userSnap.exists()) { userListDiv.innerHTML = "No one used yet"; return; }
+                userListDiv.innerHTML = "";
+                userSnap.forEach(u=>{
+                    const d = new Date(u.val().time).toLocaleString();
+                    userListDiv.innerHTML += `<div>${u.val().email} - ${d}</div>`;
+                });
+            });
+        });
+    });
+}
+function deleteCode(code) {
+    if(confirm(`Delete code ${code}?`)) {
+        db.ref("redeem_codes/" + code).remove();
+        db.ref("redeem_code_uses/" + code).remove();
+        toast("Code deleted");
+    }
+}
+loadCodes();
+
+/* LOAD HISTORY */
 document.getElementById("loadHistoryBtn").onclick = () => {
     const email = document.getElementById("historyEmail").value.trim();
     if (!email) return toast("Enter a valid email");
 
     db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
         if (!snapshot.exists()) return toast("User not found");
-
         snapshot.forEach(userSnap => {
-            const transactionsRef = db.ref("users/" + userSnap.key + "/transactions");
-            transactionsRef.once("value").then(txSnap => {
+            db.ref("users/" + userSnap.key + "/transactions").once("value").then(txSnap => {
                 let txArr = [];
                 txSnap.forEach(child => { txArr.push(child.val()); });
-
                 txArr.sort((a,b) => b.time - a.time);
-
                 const historyList = document.getElementById("historyList");
                 historyList.innerHTML = "";
                 txArr.forEach(tx => {
                     const d = new Date(tx.time).toLocaleString();
                     let title = "";
                     let amount = "";
-
                     if(tx.type === "deposit") {
                         title = `+${tx.coins} Coins (DEPOSIT)`;
                         amount = `₦${tx.amount}`;
-                    } else if(tx.type === "bet" || tx.type === "deduction") {
-                        title = `${tx.coins < 0 ? tx.coins : "+"+tx.coins} Coins (DEDUCTION${tx.game ? " - " + tx.game : ""})`;
-                        amount = tx.amount ? `₦${tx.amount}` : "";
+                    } else if(tx.type === "redeem") {
+                        title = `🎁 +${tx.coins} Coins (REDEEM)`;
+                        amount = `Code: ${tx.ref}`;
                     } else {
                         title = `${tx.coins} Coins (${tx.type.toUpperCase()})`;
                         amount = tx.amount ? `₦${tx.amount}` : "";
                     }
-
                     historyList.innerHTML += `
                         <div class="history-item">
                             <div class="history-left">
@@ -252,13 +406,11 @@ document.getElementById("loadHistoryBtn").onclick = () => {
                         </div>
                     `;
                 });
-
-                toast(`✅ Loaded ${txArr.length} transactions for ${email}`);
+                toast(`✅ Loaded ${txArr.length} transactions`);
             });
         });
     }).catch(err => { toast("❌ Error: " + err.message); });
 };
 </script>
-
 </body>
 </html>
