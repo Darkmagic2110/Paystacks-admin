@@ -81,6 +81,7 @@ input:focus {
 .glass-btn.green { border-color: rgba(0,255,0,0.5); box-shadow: 0 0 18px rgba(0,255,0,0.4); }
 .glass-btn.cyan { border-color: rgba(0,229,255,0.5); box-shadow: 0 0 18px rgba(0,229,255,0.4); }
 .glass-btn.red { border-color: rgba(255,0,0,0.7); }
+.glass-btn.purple { border-color: rgba(128,0,255,0.5); box-shadow: 0 0 18px rgba(128,0,255,0.4); }
 
 #status {
     margin-top: 15px;
@@ -107,7 +108,9 @@ input:focus {
     font-weight: 700;
     color: #00e5ff;
     letter-spacing: 1px;
+    cursor: pointer;
 }
+.code-name:hover { text-shadow: 0 0 10px #00e5ff; }
 .code-stats {
     font-size: 13px;
     color: #aaa;
@@ -169,12 +172,10 @@ input:focus {
 
 <h1>Dark Magic Admin</h1>
 
-<!-- APPROVE -->
 <button class="glass-btn green" id="approvePageBtn">✅ Approve Page</button>
 
 <div class="divider"></div>
 
-<!-- KEYS -->
 <div class="glass-card">
     <h2>🔑 Flutterwave Keys</h2>
     <input type="text" id="publicKey" placeholder="Enter Flutterwave Public Key" />
@@ -185,7 +186,6 @@ input:focus {
 
 <div class="divider"></div>
 
-<!-- ADD COINS -->
 <div class="glass-card">
     <h2>💰 Add Coins to User</h2>
     <input type="text" id="userEmail" placeholder="Enter User Email" />
@@ -195,13 +195,13 @@ input:focus {
 
 <div class="divider"></div>
 
-<!-- REDEEM CODE MANAGER -->
+<!-- REDEEM CODE MANAGER WITH AUTO GENERATE -->
 <div class="glass-card">
-    <h2>🎁 Create Redeem Code</h2>
-    <input type="text" id="newCode" placeholder="CODE NAME e.g DARK50FREE" style="text-transform:uppercase; letter-spacing:2px;" />
+    <h2>🎁 Generate Redeem Code</h2>
+    <p style="color:#aaa; font-size:13px;">Just set coins + max uses. Code will be auto-generated</p>
     <input type="number" id="codeCoins" placeholder="Coins per user" min="1" />
     <input type="number" id="codeMaxUses" placeholder="Max Uses" min="1" />
-    <button class="glass-btn cyan" id="createCodeBtn">➕ Create Code</button>
+    <button class="glass-btn purple" id="generateCodeBtn">⚡ GENERATE RANDOM CODE</button>
 </div>
 
 <div class="glass-card">
@@ -211,7 +211,6 @@ input:focus {
 
 <div class="divider"></div>
 
-<!-- HISTORY -->
 <div class="glass-card">
     <h2>📜 View User Transaction History</h2>
     <input type="text" id="historyEmail" placeholder="Enter User Email" />
@@ -248,6 +247,20 @@ function toast(msg) {
     setTimeout(() => { t.className = t.className.replace("show", ""); }, 3000);
 }
 
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text);
+    toast(`✅ Copied: ${text}`);
+}
+
+function generateRandomCode() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "DARK-";
+    for(let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
 firebase.auth().onAuthStateChanged(user => {
     if (!user) { window.location.href = "login.html"; return; }
 });
@@ -256,12 +269,10 @@ document.getElementById("approvePageBtn").onclick = () => {
     window.location.href = "approve.html";
 };
 
-/* SAVE KEYS */
 document.getElementById("saveBtn").onclick = () => {
     const publicKey = document.getElementById("publicKey").value.trim();
     const secretKey = document.getElementById("secretKey").value.trim();
     if (!publicKey || !secretKey) return toast("Both keys are required");
-
     db.ref("settings/flutterwaveKeys").set({ public: publicKey, secret: secretKey })
     .then(() => {
         document.getElementById("status").innerHTML = "✅ Keys saved successfully!";
@@ -273,39 +284,40 @@ document.getElementById("saveBtn").onclick = () => {
     });
 };
 
-/* ADD COINS */
 document.getElementById("addCoinsBtn").onclick = () => {
     const email = document.getElementById("userEmail").value.trim();
     const amount = parseInt(document.getElementById("coinAmount").value);
     if (!email || !amount || amount < 1) return toast("Enter valid email and amount");
-
     db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
         if (!snapshot.exists()) return toast("User not found!");
         snapshot.forEach(userSnap => {
             const uid = userSnap.key;
             db.ref("users/" + uid + "/balance").transaction(current => (current || 0) + amount);
             db.ref("users/" + uid + "/transactions").push({
-                type: "deposit",
-                coins: amount,
-                amount: amount,
-                ref: "DEP-" + Date.now(),
-                time: Date.now(),
-                email: email,
-                uid: uid
+                type: "deposit", coins: amount, amount: amount, ref: "DEP-" + Date.now(),
+                time: Date.now(), email: email, uid: uid
             });
             toast(`✅ Added ${amount} coins to ${email}`);
         });
     }).catch(err => { toast("❌ Error: " + err.message); });
 };
 
-/* CREATE REDEEM CODE */
-document.getElementById("createCodeBtn").onclick = () => {
-    const code = document.getElementById("newCode").value.trim().toUpperCase();
+/* NEW: AUTO GENERATE CODE */
+document.getElementById("generateCodeBtn").onclick = async () => {
     const coins = parseInt(document.getElementById("codeCoins").value);
     const maxUses = parseInt(document.getElementById("codeMaxUses").value);
+    if(!coins || !maxUses) return toast("Fill Coins and Max Uses");
 
-    if(!code || !coins || !maxUses) return toast("Fill all fields");
+    let code;
+    let exists = true;
     
+    // Loop until we get a unique code
+    while(exists) {
+        code = generateRandomCode();
+        const snap = await db.ref("redeem_codes/" + code).once("value");
+        exists = snap.exists();
+    }
+
     db.ref("redeem_codes/" + code).set({
         coins: coins,
         maxUses: maxUses,
@@ -313,9 +325,9 @@ document.getElementById("createCodeBtn").onclick = () => {
         createdAt: Date.now()
     }).then(()=>{
         toast(`✅ Code ${code} created!`);
-        document.getElementById("newCode").value = "";
         document.getElementById("codeCoins").value = "";
         document.getElementById("codeMaxUses").value = "";
+        copyToClipboard(code);
         loadCodes();
     });
 };
@@ -334,7 +346,7 @@ function loadCodes() {
             codeDiv.className = "code-item";
             codeDiv.innerHTML = `
                 <div class="code-header">
-                    <div class="code-name">${code}</div>
+                    <div class="code-name" onclick="copyToClipboard('${code}')">${code} 📋</div>
                     <button class="glass-btn red" style="width:auto; padding:6px 12px; font-size:12px;" onclick="deleteCode('${code}')">Delete</button>
                 </div>
                 <div class="code-stats">${data.usedCount}/${data.maxUses} Used | ${data.coins} Coins each</div>
@@ -342,7 +354,6 @@ function loadCodes() {
             `;
             codesList.appendChild(codeDiv);
 
-            // Load who used this code
             db.ref("redeem_code_uses/" + code).once("value").then(userSnap=>{
                 const userListDiv = document.getElementById(`users-${code}`);
                 if(!userSnap.exists()) { userListDiv.innerHTML = "No one used yet"; return; }
@@ -364,11 +375,9 @@ function deleteCode(code) {
 }
 loadCodes();
 
-/* LOAD HISTORY */
 document.getElementById("loadHistoryBtn").onclick = () => {
     const email = document.getElementById("historyEmail").value.trim();
     if (!email) return toast("Enter a valid email");
-
     db.ref("users").orderByChild("email").equalTo(email).once("value").then(snapshot => {
         if (!snapshot.exists()) return toast("User not found");
         snapshot.forEach(userSnap => {
