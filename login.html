@@ -101,7 +101,7 @@ function login() {
     firebase.auth().signInWithEmailAndPassword(email, pass)
     .then(() => {
         alert("𝐋𝐨𝐠𝐢𝐧 𝐒𝐮𝐜𝐜𝐞𝐬𝐬𝐟𝐮𝐥");
-        window.location.href = "maining.html";
+        window.location.href = "index.html";
     })
     .catch(error => {
         alert(error.message);
