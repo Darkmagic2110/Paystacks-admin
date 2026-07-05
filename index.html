@@ -64,7 +64,7 @@ input:focus {
     padding: 14px;
     background: rgba(255, 0, 0, 0.15);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 0, 0, 0.5);
+    border: 1px solid rgba(255, 0, 0.5);
     font-size: 16px;
     color: #ffffff;
     font-weight: 700;
@@ -399,7 +399,7 @@ document.getElementById("deleteAllBtn").onclick = () => {
     }
 };
 
-/* LOAD ALL CODES + AUTO DELETE USED SINGLE-USE */
+/* LOAD ALL CODES + HIDE USED SINGLE-USE FROM UI ONLY */
 function loadCodes() {
     db.ref("redeem_codes").on("value", snap=>{
         const codesList = document.getElementById("codesList");
@@ -410,11 +410,9 @@ function loadCodes() {
             const code = codeSnap.key;
             const data = codeSnap.val();
 
-            // AUTO DELETE: if single-use and usedCount >= maxUses
+            // HIDE FROM UI ONLY: if single-use and usedCount >= maxUses
             if(data.type === "single-use" && data.usedCount >= data.maxUses) {
-                db.ref("redeem_codes/" + code).remove();
-                db.ref("redeem_code_uses/" + code).remove();
-                return; // skip showing this code
+                return; // skip showing this code but keep in Firebase
             }
 
             const typeTag = data.type === "single-use" ? "🔒 1-Use" : "👥 Multi";
