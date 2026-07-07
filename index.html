@@ -64,7 +64,7 @@ input:focus {
     padding: 14px;
     background: rgba(255, 0, 0, 0.15);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 0, 0.5);
+    border: 1px solid rgba(255, 0, 0, 0.5);
     font-size: 16px;
     color: #ffffff;
     font-weight: 700;
@@ -80,7 +80,7 @@ input:focus {
 }
 .glass-btn.green { border-color: rgba(0,255,0,0.5); box-shadow: 0 0 18px rgba(0,255,0,0.4); }
 .glass-btn.cyan { border-color: rgba(0,229,255,0.5); box-shadow: 0 0 18px rgba(0,229,255,0.4); }
-.glass-btn.red { border-color: rgba(255,0,0,0.7); }
+.glass-btn.red { border-color: rgba(255,0,0,0.7); background: rgba(255,0,0,0.2); }
 .glass-btn.purple { border-color: rgba(128,0,255,0.5); box-shadow: 0 0 18px rgba(128,0,255,0.4); }
 .glass-btn.orange { border-color: rgba(255,165,0,0.5); box-shadow: 0 0 18px rgba(255,165,0,0.4); }
 .glass-btn.dark { border-color: rgba(100,100,100,0.5); background: rgba(50,50,50,0.3); }
@@ -171,6 +171,8 @@ input:focus {
 .bulk-result { background: #000; padding: 10px; border-radius: 10px; max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px dashed #00e5ff; }
 .bulk-result div { font-family: monospace; color: #00ff88; padding: 2px 0; font-size: 13px; }
 .flex-row { display: flex; gap: 10px; align-items: center; }
+
+#lockStatus {text-align:center; font-size:16px; font-weight:700; margin-bottom:10px;}
 </style>
 </head>
 <body>
@@ -178,6 +180,15 @@ input:focus {
 <h1>Dark Magic Admin</h1>
 
 <button class="glass-btn green" id="approvePageBtn">✅ Approve Page</button>
+
+<!-- NEW: BOT LOCKDOWN CONTROLS -->
+<div class="glass-card">
+    <h2>🚨 Bot Kill Switch</h2>
+    <div id="lockStatus">Checking status...</div>
+    <button class="glass-btn red" id="lockBotBtn">🔒 LOCK BOT</button>
+    <button class="glass-btn green" id="unlockBotBtn">🔓 UNLOCK BOT</button>
+    <p style="color:#aaa; font-size:12px; margin-top:10px;">When locked, users see "THIS BOT IS NO LONGER FUNCTIONING" screen</p>
+</div>
 
 <div class="divider"></div>
 
@@ -288,6 +299,34 @@ firebase.auth().onAuthStateChanged(user => {
 
 document.getElementById("approvePageBtn").onclick = () => {
     window.location.href = "approve.html";
+};
+
+// NEW: LOCK/UNLOCK BOT
+function updateLockStatus() {
+    db.ref("settings/botLockdown").on("value", snap => {
+        const locked = snap.val() === true;
+        document.getElementById("lockStatus").innerHTML = locked ? 
+            "🔴 STATUS: BOT IS LOCKED" : 
+            "🟢 STATUS: BOT IS ACTIVE";
+        document.getElementById("lockStatus").style.color = locked ? "#ff1a1a" : "#00ff88";
+    });
+}
+updateLockStatus();
+
+document.getElementById("lockBotBtn").onclick = () => {
+    if(confirm("⚠️ Lock the bot for ALL users?")) {
+        db.ref("settings/botLockdown").set(true).then(()=>{
+            toast("🔒 Bot Locked!");
+        });
+    }
+};
+
+document.getElementById("unlockBotBtn").onclick = () => {
+    if(confirm("✅ Unlock the bot for ALL users?")) {
+        db.ref("settings/botLockdown").set(false).then(()=>{
+            toast("🔓 Bot Unlocked!");
+        });
+    }
 };
 
 document.getElementById("saveBtn").onclick = () => {
@@ -410,9 +449,8 @@ function loadCodes() {
             const code = codeSnap.key;
             const data = codeSnap.val();
 
-            // HIDE FROM UI ONLY: if single-use and usedCount >= maxUses
             if(data.type === "single-use" && data.usedCount >= data.maxUses) {
-                return; // skip showing this code but keep in Firebase
+                return;
             }
 
             const typeTag = data.type === "single-use" ? "🔒 1-Use" : "👥 Multi";
